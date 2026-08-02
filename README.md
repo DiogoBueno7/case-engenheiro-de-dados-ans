@@ -57,10 +57,31 @@ flowchart LR
 
 ---
 
+## Dados (como obter)
+
+O arquivo bruto **não é versionado** no Git (≈ **1,5 GB**, `4.830.707` registros) —
+por isso, após clonar o repositório, é preciso baixá-lo separadamente.
+
+- **Fonte:** Dados Abertos da ANS — <https://dadosabertos.ans.gov.br/> (seção de
+  *Informações Consolidadas de Beneficiários*).
+- **Arquivo esperado:** `pda-024-icb-SP-2025_08.csv` — beneficiários de São Paulo,
+  competência **2025-08**. UTF-8, separador `;`, campos entre aspas.
+- **Onde colocar:** na pasta `data/` na raiz do projeto, com o nome exato acima:
+
+  ```
+  data/pda-024-icb-SP-2025_08.csv
+  ```
+
+> Para reproduzir com outra competência/UF, basta ajustar o caminho em
+> `.env` / `src/config.py` (placeholder `{{CSV_PATH}}`) — o SQL não muda.
+
+---
+
 ## Como executar
 
 Pré-requisitos: **Docker** e **Docker Compose**. O arquivo
-`data/pda-024-icb-SP-2025_08.csv` já deve estar na pasta `data/`.
+`data/pda-024-icb-SP-2025_08.csv` já deve estar na pasta `data/`
+(veja **[Dados (como obter)](#dados-como-obter)** acima).
 
 ```bash
 # 1. (opcional) copie o exemplo de variáveis de ambiente
