@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="820" viewBox="0 0 1320 820" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#475569"/>
+    </marker>
+    <marker id="arrowDash" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#017cee"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1320" height="820" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="660" y="46" text-anchor="middle" font-size="27" font-weight="700" fill="#0f172a">Pipeline Medallion — ANS Beneficiários SP</text>
+  <text x="660" y="74" text-anchor="middle" font-size="14" fill="#475569">Lakehouse local em Docker espelhando a stack AWS / Databricks · 4.830.707 registros (competência 2025-08)</text>
+
+  <!-- Airflow orchestration bar -->
+  <rect x="60" y="100" width="1200" height="54" rx="10" fill="#e6f2fc" stroke="#017cee" stroke-width="2"/>
+  <text x="660" y="132" text-anchor="middle" font-size="15" font-weight="600" fill="#014a8f">Apache Airflow — orquestração (DAG @monthly · retry · UI)   ·   equivale a AWS MWAA / Databricks Workflows</text>
+
+  <!-- Dashed trigger arrows from Airflow to layers -->
+  <line x1="415" y1="154" x2="415" y2="246" stroke="#017cee" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrowDash)"/>
+  <line x1="650" y1="154" x2="650" y2="246" stroke="#017cee" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrowDash)"/>
+  <line x1="885" y1="154" x2="885" y2="246" stroke="#017cee" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrowDash)"/>
+  <line x1="1180" y1="154" x2="1180" y2="296" stroke="#017cee" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrowDash)"/>
+
+  <!-- Source CSV -->
+  <rect x="60" y="300" width="180" height="150" rx="8" fill="#eef2f7" stroke="#64748b" stroke-width="1.5"/>
+  <text x="150" y="345" text-anchor="middle" font-size="15" font-weight="600" fill="#0f172a">CSV bruto (ANS)</text>
+  <text x="150" y="372" text-anchor="middle" font-size="12.5" fill="#475569">1,46 GB · 4,83M linhas</text>
+  <text x="150" y="392" text-anchor="middle" font-size="12.5" fill="#475569">separador ';'</text>
+  <text x="150" y="418" text-anchor="middle" font-size="11.5" fill="#94a3b8">landing / data mount</text>
+
+  <!-- Data Lake container -->
+  <rect x="290" y="250" width="760" height="250" rx="12" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="7,5"/>
+  <text x="306" y="274" font-size="14" font-weight="700" fill="#334155">Data Lake — MinIO (S3-compatible)  ·  camadas Delta Lake</text>
+
+  <!-- Bronze -->
+  <rect x="310" y="300" width="210" height="150" rx="8" fill="#f0d9bf" stroke="#cd7f32" stroke-width="2"/>
+  <text x="415" y="342" text-anchor="middle" font-size="16" font-weight="700" fill="#7c4a1e">BRONZE</text>
+  <text x="415" y="366" text-anchor="middle" font-size="12.5" fill="#5c3a18">Raw · dados as-is</text>
+  <text x="415" y="388" text-anchor="middle" font-size="12.5" fill="#5c3a18">Delta + auditoria</text>
+  <text x="415" y="424" text-anchor="middle" font-size="11.5" fill="#8a6a45">preserva original</text>
+
+  <!-- Silver -->
+  <rect x="545" y="300" width="210" height="150" rx="8" fill="#e2e8f0" stroke="#7c8794" stroke-width="2"/>
+  <text x="650" y="342" text-anchor="middle" font-size="16" font-weight="700" fill="#334155">SILVER</text>
+  <text x="650" y="366" text-anchor="middle" font-size="12.5" fill="#334155">Delta tipado</text>
+  <text x="650" y="388" text-anchor="middle" font-size="12.5" fill="#334155">CNPJ mascarado</text>
+  <text x="650" y="410" text-anchor="middle" font-size="12.5" fill="#334155">particionado (competência)</text>
+
+  <!-- Gold -->
+  <rect x="780" y="300" width="210" height="150" rx="8" fill="#f5e6b3" stroke="#d4af37" stroke-width="2"/>
+  <text x="885" y="342" text-anchor="middle" font-size="16" font-weight="700" fill="#8a6d12">GOLD</text>
+  <text x="885" y="366" text-anchor="middle" font-size="12.5" fill="#6b540e">Curated · agregado</text>
+  <text x="885" y="388" text-anchor="middle" font-size="12.5" fill="#6b540e">1 tabela por pergunta</text>
+  <text x="885" y="424" text-anchor="middle" font-size="11.5" fill="#9a7d1e">otimizado p/ consulta</text>
+
+  <!-- Output -->
+  <rect x="1090" y="300" width="170" height="150" rx="8" fill="#eef2f7" stroke="#64748b" stroke-width="1.5"/>
+  <text x="1175" y="342" text-anchor="middle" font-size="15" font-weight="600" fill="#0f172a">Consultas SQL</text>
+  <text x="1175" y="368" text-anchor="middle" font-size="12.5" fill="#475569">3 respostas</text>
+  <text x="1175" y="388" text-anchor="middle" font-size="12.5" fill="#475569">→ output/*.csv</text>
+  <text x="1175" y="418" text-anchor="middle" font-size="11.5" fill="#94a3b8">Athena / DBX SQL</text>
+
+  <!-- Flow arrows -->
+  <line x1="240" y1="375" x2="308" y2="375" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="274" y="366" text-anchor="middle" font-size="11" fill="#334155">Spark SQL</text>
+
+  <line x1="520" y1="375" x2="543" y2="375" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="532" y="288" text-anchor="middle" font-size="11" fill="#334155"> </text>
+
+  <line x1="755" y1="375" x2="778" y2="375" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <line x1="990" y1="375" x2="1088" y2="375" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="1039" y="366" text-anchor="middle" font-size="11" fill="#334155">consultas</text>
+
+  <!-- transform labels between layers -->
+  <text x="532" y="470" text-anchor="middle" font-size="11" fill="#64748b">tipagem + máscara</text>
+  <text x="767" y="470" text-anchor="middle" font-size="11" fill="#64748b">agregações</text>
+
+  <!-- Tech equivalence legend -->
+  <rect x="60" y="560" width="1200" height="86" rx="10" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="80" y="586" font-size="13" font-weight="700" fill="#334155">Equivalência local → produção</text>
+  <text x="80" y="612" font-size="13" fill="#475569">PySpark → AWS Glue / Databricks    ·    Delta Lake → Delta Lake    ·    MinIO → Amazon S3</text>
+  <text x="80" y="634" font-size="13" fill="#475569">Spark SQL → Amazon Athena / Databricks SQL    ·    Gold → Amazon Redshift    ·    Airflow → MWAA / Databricks Workflows</text>
+
+  <!-- Results strip -->
+  <text x="660" y="686" text-anchor="middle" font-size="13" font-weight="600" fill="#0f172a">Resultados:  (a) Notre Dame Intermédica 4.324.507   ·   (b) faixa 40–44 anos 3.100.823   ·   (c) São Paulo 9.833.635  (de 646 municípios)</text>
+
+  <!-- footer -->
+  <text x="660" y="770" text-anchor="middle" font-size="11.5" fill="#94a3b8">docker compose up  →  bronze → silver → gold → consultas   |   o mesmo SQL/Spark roda no Databricks trocando MinIO pelo S3</text>
+</svg>

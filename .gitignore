@@ -1,0 +1,29 @@
+# Dados brutos (grandes) - não versionar
+data/*.csv
+data/*.zip
+
+# Saídas do pipeline
+output/
+lake/
+
+# Delta / Spark / Hive metastore local
+spark-warehouse/
+metastore_db/
+derby.log
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Ivy / jars baixados
+.ivy2/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Env local
+.env
+
+# Config local do Claude Code
+.claude/
