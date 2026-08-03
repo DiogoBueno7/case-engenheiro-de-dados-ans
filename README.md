@@ -176,17 +176,6 @@ Também dá para rodar tudo pela linha de comando, sem a UI:
 docker compose exec airflow-scheduler airflow dags test pipeline_medallion_ans 2025-08-01
 ```
 
-> Observação: o **primeiro boot** do Airflow é lento (migração do banco +
-> criação de papéis). Se a UI na 8080 demorar a responder, aguarde alguns
-> minutos ou rode `docker compose restart airflow-webserver` — no segundo boot
-> ela sobe em segundos. O Airflow roda em **modo produção**: metadados em
-> **Postgres** e componentes separados (`airflow-webserver` + `airflow-scheduler`)
-> com **LocalExecutor** — não o `standalone`/SQLite, que não suporta a
-> concorrência dos três componentes. Em produção, trocaria o LocalExecutor por
-> Celery/Kubernetes Executor.
-
----
-
 ## Consultas do case
 
 As três respostas estão em `sql/03_consultas.sql` e são executadas por
