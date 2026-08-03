@@ -170,11 +170,53 @@ tamanho de hoje.
 Delta dá transações ACID, versionamento (time travel) e evolução de schema sobre o
 Parquet. Para camadas que são reescritas (Silver/Gold), isso evita estados
 corrompidos em falhas — que, aliás, foi útil quando um job deu OOM no meio.
+Concretamente: Delta é **Parquet + um log de transações** (`_delta_log/`). Os dados
+continuam em `.parquet`; o log é que registra, a cada escrita, quais arquivos
+entraram (`add`) e saíram (`remove`). Toda leitura reconstrói a versão vigente a
+partir desse log e lê **só os arquivos ativos** — é isso que desacopla "arquivos no
+disco" de "linhas na tabela" e garante que reprocessar N vezes não duplique dado.
+
+**"Por que Delta e não Iceberg ou Hudi?"** *(cartão de defesa)*
+Os três são **open table formats** — a mesma ideia (camada transacional ACID sobre
+Parquet num object storage). A escolha é sobre **fit com a stack-alvo**, não sobre
+qual é "melhor":
+
+| Formato | Origem | Força | Quando eu escolheria |
+|---------|--------|-------|----------------------|
+| **Delta Lake** | Databricks | Integração nativa com Spark/Databricks; Medallion é conceito da própria Databricks | **Stack Databricks/Spark** — o caso desta empresa |
+| **Apache Iceberg** | Netflix | Neutro de engine (Spark, Trino, Athena, Snowflake); virou padrão de fato no mundo AWS | Se fosse **AWS nativo** (Athena/Glue/Redshift) sem Databricks |
+| **Apache Hudi** | Uber | Upserts e CDC de baixa latência | Ingestão **streaming/incremental** pesada |
+
+Escolhi **Delta** porque a stack de produção da empresa é **Databricks + Spark**: o
+mesmo código roda no Databricks sem reescrita, e o vocabulário Bronze/Silver/Gold
+(Medallion) nasceu na Databricks, casando com Delta. Se a stack fosse AWS pura, eu
+avaliaria **Iceberg** (hoje o mais neutro/adotado); se o problema fosse CDC em tempo
+quase real, **Hudi**. Vale notar que a tendência de mercado (2024–2025) é de
+**convergência** — a Databricks passou a suportar interoperabilidade Delta↔Iceberg
+(UniForm), então dominar o *conceito* de open table format importa mais que o
+formato específico. Governança/catálogo, aliás, é a fronteira atual: aqui uso um
+metastore Hive simples; em produção seria **Glue Data Catalog** ou **Unity Catalog**.
+
+**"Como você garante que rodar o pipeline (Airflow / notebook) várias vezes não
+duplica os dados?"**
+Por design: todas as camadas usam `CREATE OR REPLACE TABLE`, que **descarta e
+reescreve a tabela inteira** a cada execução. É um padrão *full-refresh*
+idempotente — rodar 1 ou 100 vezes leva sempre ao mesmo estado final. Não há
+`INSERT INTO` nem `append` em lugar nenhum do fluxo, então é impossível acumular
+linhas repetidas. Como cada task do Airflow é um processo separado, isso também
+significa que reexecutar uma etapa isolada (ex.: só a Silver) é seguro: ela
+reconstrói a tabela do zero a partir da camada anterior, sem depender de estado
+acumulado.
 
 **"O `CREATE OR REPLACE TABLE` não apaga histórico?"**
-Para este case (uma competência, carga cheia) é adequado. Para cargas mensais
-incrementais, a evolução natural é `MERGE` (upsert) por chave/competência,
-aproveitando o particionamento por `id_cmpt_movel` que já deixei pronto.
+Para este case (uma competência, carga cheia) é adequado e é justamente o que
+garante a idempotência acima. O trade-off assumido é que **não é incremental**: a
+Silver é particionada por `id_cmpt_movel`, mas o `CREATE OR REPLACE` apaga todas as
+competências e recria só a do CSV atual — carregar um mês novo substituiria o
+anterior, não somaria. Para cargas mensais acumuladas, a evolução natural é
+`INSERT OVERWRITE ... replaceWhere id_cmpt_movel = '<competência>'` (ou `MERGE`
+por chave), que sobrescreve **só a partição do mês carregado**, mantendo os demais
+meses e continuando idempotente — aproveitando o particionamento que já deixei pronto.
 
 **"Como escalaria para todas as UFs / histórico mensal?"**
 O particionamento por competência já suporta append mensal; bastaria parametrizar a

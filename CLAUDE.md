@@ -90,6 +90,18 @@ data/          CSV bruto (não versionado)
 - **SQL como linguagem central:** toda transformação está em `sql/*.sql`; o Python
   só orquestra. Placeholders `{{LAKE_ROOT}}` / `{{CSV_PATH}}` são substituídos em
   `sql_runner.py`.
+- **Idempotência por full-refresh (sem duplicação):** todas as tabelas são criadas
+  com `CREATE OR REPLACE TABLE` (Bronze/Silver/Gold). Cada execução **descarta e
+  reescreve a tabela inteira**, então rodar N vezes — pelo Airflow, pelo
+  `run_pipeline` ou pelo notebook — produz sempre o mesmo estado final: não há como
+  acumular linhas repetidas. **Não existe `INSERT INTO` nem `.mode("append")` em
+  nenhum ponto do fluxo.** Trade-off assumido: é carga **cheia** de uma competência,
+  não incremental. A Silver é `PARTITIONED BY (id_cmpt_movel)` (padrão para cargas
+  mensais), mas o `CREATE OR REPLACE` apaga *todas* as competências e recria só a do
+  CSV atual — carregar 2025-09 hoje **substituiria** 2025-08, não somaria. Para
+  histórico multi-mês, a evolução natural é trocar o `CREATE OR REPLACE` da Silver por
+  `INSERT OVERWRITE` com `replaceWhere id_cmpt_movel = '<competência>'` (ou `MERGE`),
+  sobrescrevendo só a partição do mês carregado e mantendo idempotência.
 - **Mascaramento (Silver):** CNPJ vira `CONCAT(SUBSTRING(nr_cnpj,1,8),'******')`
   (mantém só a raiz de 8 dígitos).
 - **Particionamento:** Silver particionada por `id_cmpt_movel` (competência mensal);

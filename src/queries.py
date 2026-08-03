@@ -1,6 +1,10 @@
 """
 Executa as 3 consultas do case sobre a camada Gold, imprime no console e
 salva os resultados em output/ (CSV) para servirem de entregável.
+
+O SQL das consultas vive em sql/03_consultas.sql (fonte única da verdade,
+igual às demais camadas). Aqui só lemos os statements de lá, executamos e
+salvamos cada resultado no CSV correspondente.
 """
 
 from __future__ import annotations
@@ -9,7 +13,12 @@ from pathlib import Path
 
 from pyspark.sql import DataFrame, SparkSession
 
+from src.config import sql_params
+from src.sql_runner import parse_named_sql_file
+
 OUTPUT_DIR = Path("/app/output")
+
+CONSULTAS_SQL = "03_consultas.sql"
 
 
 def _save(df: DataFrame, name: str) -> None:
@@ -20,69 +29,15 @@ def _save(df: DataFrame, name: str) -> None:
 
 
 def run_queries(spark: SparkSession) -> None:
-    # (a) Top 5 operadoras por beneficiários ativos
-    top_operadoras = spark.sql(
-        """
-        SELECT cd_operadora, nm_razao_social, qt_beneficiarios_ativos
-        FROM gold.beneficiarios_por_operadora
-        ORDER BY qt_beneficiarios_ativos DESC
-        LIMIT 5
-        """
-    )
+    """Executa cada consulta de 03_consultas.sql e salva output/<nome>.csv.
 
-    # (b) Faixa etária com mais beneficiários
-    top_faixa = spark.sql(
-        """
-        SELECT de_faixa_etaria, qt_beneficiarios_ativos
-        FROM gold.beneficiarios_por_faixa_etaria
-        ORDER BY qt_beneficiarios_ativos DESC
-        LIMIT 1
-        """
-    )
+    O nome (`-- out:`) e o rótulo (`-- label:`) vêm do próprio .sql, então
+    adicionar, remover ou reordenar consultas é feito só no arquivo SQL.
+    """
+    for q in parse_named_sql_file(CONSULTAS_SQL, sql_params()):
+        df = spark.sql(q.sql)
+        print(f"\n{q.label}:")
+        df.show(20, truncate=False)
+        _save(df, q.name)
 
-    # (c) Beneficiários por município (decrescente)
-    por_municipio = spark.sql(
-        """
-        SELECT cd_municipio, nm_municipio, qt_beneficiarios_ativos
-        FROM gold.beneficiarios_por_municipio
-        ORDER BY qt_beneficiarios_ativos DESC
-        """
-    )
-
-    print("\n(a) Top 5 operadoras por beneficiários ativos:")
-    top_operadoras.show(truncate=False)
-
-    print("(b) Faixa etária com mais beneficiários:")
-    top_faixa.show(truncate=False)
-
-    print("(c) Beneficiários por município (top 20 de", por_municipio.count(), "):")
-    por_municipio.show(20, truncate=False)
-
-    _save(top_operadoras, "a_top5_operadoras")
-    _save(top_faixa, "b_faixa_etaria_top")
-    _save(por_municipio, "c_beneficiarios_por_municipio")
-
-    # ------------------------------------------------------------------
-    # Insights adicionais (distribuições completas). Não fazem parte das
-    # 3 respostas do case, mas alimentam o dashboard Streamlit com material
-    # para análises de concentração de mercado e perfil demográfico.
-    # As tabelas Gold já são pequenas, então exportar tudo é barato.
-    # ------------------------------------------------------------------
-    operadoras_full = spark.sql(
-        """
-        SELECT cd_operadora, nm_razao_social, qt_beneficiarios_ativos
-        FROM gold.beneficiarios_por_operadora
-        ORDER BY qt_beneficiarios_ativos DESC
-        """
-    )
-    faixa_full = spark.sql(
-        """
-        SELECT de_faixa_etaria, qt_beneficiarios_ativos
-        FROM gold.beneficiarios_por_faixa_etaria
-        ORDER BY qt_beneficiarios_ativos DESC
-        """
-    )
-
-    _save(operadoras_full, "insight_operadoras")
-    _save(faixa_full, "insight_faixa_etaria")
     print(f"\nResultados salvos em {OUTPUT_DIR}/")
