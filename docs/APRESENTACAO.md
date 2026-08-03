@@ -132,15 +132,23 @@ Esta seção é o coração da defesa: mostra depuração real, não um caminho 
 - **Lição:** o que funciona num script monolítico pode quebrar em orquestração
   distribuída. Catálogo persistente é pré-requisito para pipelines multi-job.
 
-### 5.5. Webserver do Airflow lento no primeiro boot
-- **Sintoma:** a UI na porta 8080 não respondia (HTTP 000) por vários minutos.
-- **Causa raiz:** o primeiro boot do modo `standalone` faz migração de banco +
-  semeadura de papéis/permissões (RBAC), competindo por CPU com o Spark que rodava
-  ao mesmo tempo.
-- **Solução:** `docker compose restart airflow` — com o banco já inicializado, o
-  segundo boot sobe a UI em segundos.
-- **Lição:** primeiro boot de ferramentas com metadados é caro; em produção o DB de
-  metadados é externo (Postgres) e persistente, eliminando isso.
+### 5.5. Airflow standalone (SQLite) não subia a UI — troquei por setup de produção
+- **Sintoma:** no modo `standalone` a UI na porta 8080 nunca entrava em LISTEN;
+  ficava respondendo HTTP 000 indefinidamente.
+- **Causa raiz:** o `standalone` usa **SQLite + SequentialExecutor**, que não suporta
+  a concorrência dos 3 componentes (webserver, scheduler, migração) subindo juntos —
+  o webserver não completava o boot.
+- **Solução:** migrei para o **setup real de produção**: metadados em **Postgres**,
+  serviços **separados** (`airflow-webserver` + `airflow-scheduler`) com
+  **LocalExecutor**, e um `airflow-init` one-shot que faz a migração do schema +
+  cria o admin antes dos serviços subirem. A ordem é garantida por healthchecks
+  (`postgres` healthy → `airflow-init` Exited 0 → webserver/scheduler).
+- **Detalhe fino:** como as tasks rodam no processo do **scheduler** (LocalExecutor),
+  é ele — e não o webserver — que monta o `docker.sock` para disparar o
+  `docker exec case-spark`.
+- **Lição:** o `standalone` é ótimo pra demo, mas SQLite não aguenta orquestração
+  concorrente; o padrão de produção (Postgres + serviços separados) é mais robusto
+  e foi o que adotei.
 
 ### 5.6. Sustos "falsos" (importante saber explicar)
 - **`case-minio-init` aparece como "Exited (0)"** no Docker Desktop: **não é erro**.
@@ -187,10 +195,13 @@ warehouse (o equivalente ao Redshift).
 Reprocessei do zero (limpando o lake) e os resultados foram idênticos —
 determinismo, sinal de um pipeline confiável e sem efeitos colaterais de estado.
 
-**"Airflow standalone em produção?"**
-Não. O `standalone` (SQLite + SequentialExecutor) é para o case/local. Em produção
-seria Postgres para os metadados + Celery/Kubernetes Executor para paralelismo e
-resiliência.
+**"Como está montado o Airflow?"**
+Em **modo de produção**, não standalone: metadados em **Postgres**, serviços
+separados (`airflow-webserver` + `airflow-scheduler`) com **LocalExecutor**.
+Comecei com o `standalone` (SQLite), mas ele não suportava a concorrência dos
+componentes e a UI não subia — daí a migração. O próximo passo para escala real
+seria trocar o LocalExecutor por **Celery/Kubernetes Executor** (paralelismo
+multi-nó) e um Postgres gerenciado.
 
 **"Onde estão os logs / como monitoraria?"**
 Localmente: Spark UI (4040), logs por task na UI do Airflow (8080), console do MinIO
@@ -199,7 +210,8 @@ Localmente: Spark UI (4040), logs por task na UI do Airflow (8080), console do M
 ## 7. Limitações assumidas (honestidade ajuda na defesa)
 
 - Carga **full** de uma competência (não incremental) — evolução clara é `MERGE`.
-- Airflow em `standalone` (não é setup de produção).
+- Airflow com **LocalExecutor** (single-node): bom para o case, mas para escala real
+  seria Celery/Kubernetes Executor com Postgres gerenciado.
 - Sem testes automatizados de qualidade de dado (ex.: Great Expectations) — próximo
   passo natural para validar tipos, nulos e faixas.
 - Metastore Derby embutido (single-node) — em produção seria Glue Data Catalog /

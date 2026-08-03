@@ -45,6 +45,41 @@ flowchart LR
 
 </details>
 
+### Arquitetura técnica (componentes)
+
+O diagrama acima mostra o **fluxo dos dados** (camadas Medallion). Este mostra **como
+o pipeline roda de fato** — a stack que emula, localmente, o ambiente de produção na
+nuvem (ver tabela de equivalências no topo):
+
+```mermaid
+flowchart TB
+    subgraph ORQ[Orquestração]
+        AF[Apache Airflow<br/>DAG mensal + retry]
+    end
+
+    subgraph PROC[Processamento]
+        SP[PySpark + Spark SQL<br/>motor de ETL]
+    end
+
+    subgraph LAKE[Data Lake - MinIO / S3]
+        BR[(Bronze<br/>Delta)]
+        SI[(Silver<br/>Delta)]
+        GO[(Gold<br/>Delta)]
+    end
+
+    CSV[/CSV ANS<br/>~1,5 GB/] --> SP
+    AF -->|docker exec por etapa| SP
+    SP --> BR --> SI --> GO
+    GO -->|export agregados| OUT[/output/*.csv/]
+    OUT --> ST[Streamlit<br/>Dashboard / BI]
+```
+
+- O **Airflow** apenas orquestra: cada task dispara uma etapa no container Spark via
+  `docker exec` — **sem duplicar** a lógica, que continua nos scripts SQL.
+- O **Spark** lê o CSV bruto e grava as camadas em **Delta** no **MinIO** (S3-compatible).
+- O **Streamlit** é desacoplado do Spark: consome só os agregados da Gold
+  (`output/*.csv`), sem reprocessar os 4,8M de registros.
+
 ### Camadas
 
 - **Bronze** (`sql/00_bronze.sql`) — ingestão do CSV *as-is*, todas as colunas como
@@ -137,15 +172,18 @@ Na UI, habilite (toggle) o DAG `pipeline_medallion_ans` e clique em **Trigger**.
 Também dá para rodar tudo pela linha de comando, sem a UI:
 
 ```bash
-# executa o DAG inteiro de forma síncrona
-docker compose exec airflow airflow dags test pipeline_medallion_ans 2025-08-01
+# executa o DAG inteiro de forma síncrona (roda no processo do scheduler)
+docker compose exec airflow-scheduler airflow dags test pipeline_medallion_ans 2025-08-01
 ```
 
 > Observação: o **primeiro boot** do Airflow é lento (migração do banco +
 > criação de papéis). Se a UI na 8080 demorar a responder, aguarde alguns
-> minutos ou rode `docker compose restart airflow` — no segundo boot ela sobe
-> em segundos. O Airflow roda em modo `standalone` (SQLite + SequentialExecutor),
-> adequado ao case; em produção usaria Postgres + Celery/Kubernetes Executor.
+> minutos ou rode `docker compose restart airflow-webserver` — no segundo boot
+> ela sobe em segundos. O Airflow roda em **modo produção**: metadados em
+> **Postgres** e componentes separados (`airflow-webserver` + `airflow-scheduler`)
+> com **LocalExecutor** — não o `standalone`/SQLite, que não suporta a
+> concorrência dos três componentes. Em produção, trocaria o LocalExecutor por
+> Celery/Kubernetes Executor.
 
 ---
 
