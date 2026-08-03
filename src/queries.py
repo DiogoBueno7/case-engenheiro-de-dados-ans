@@ -61,4 +61,28 @@ def run_queries(spark: SparkSession) -> None:
     _save(top_operadoras, "a_top5_operadoras")
     _save(top_faixa, "b_faixa_etaria_top")
     _save(por_municipio, "c_beneficiarios_por_municipio")
+
+    # ------------------------------------------------------------------
+    # Insights adicionais (distribuições completas). Não fazem parte das
+    # 3 respostas do case, mas alimentam o dashboard Streamlit com material
+    # para análises de concentração de mercado e perfil demográfico.
+    # As tabelas Gold já são pequenas, então exportar tudo é barato.
+    # ------------------------------------------------------------------
+    operadoras_full = spark.sql(
+        """
+        SELECT cd_operadora, nm_razao_social, qt_beneficiarios_ativos
+        FROM gold.beneficiarios_por_operadora
+        ORDER BY qt_beneficiarios_ativos DESC
+        """
+    )
+    faixa_full = spark.sql(
+        """
+        SELECT de_faixa_etaria, qt_beneficiarios_ativos
+        FROM gold.beneficiarios_por_faixa_etaria
+        ORDER BY qt_beneficiarios_ativos DESC
+        """
+    )
+
+    _save(operadoras_full, "insight_operadoras")
+    _save(faixa_full, "insight_faixa_etaria")
     print(f"\nResultados salvos em {OUTPUT_DIR}/")

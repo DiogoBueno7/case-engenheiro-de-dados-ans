@@ -14,6 +14,7 @@ O projeto emula, **localmente via Docker**, a mesma stack usada em produção na
 | Object storage (data lake)   | **MinIO** (S3-compatible)       | Amazon S3                                  |
 | Consulta SQL analítica       | **Spark SQL**                   | Amazon Athena / Databricks SQL             |
 | Camada curada (warehouse)    | **Gold (Delta)**                | Amazon Redshift                            |
+| Visualização / BI            | **Streamlit**                   | Amazon QuickSight / Power BI / Databricks  |
 
 O mesmo código Spark/Delta e os mesmos scripts SQL rodam sem alteração no
 **Databricks** (basta apontar os caminhos para o S3 real).
@@ -94,6 +95,7 @@ docker compose up -d --build
 docker compose exec spark python -m src.run_pipeline
 ```
 
+- **Dashboard (Streamlit)** — respostas do case + insights: http://localhost:8501
 - **JupyterLab** (notebooks estilo Databricks): http://localhost:8888
 - **Console do MinIO** (ver os buckets bronze/silver/gold): http://localhost:9001
   (usuário/senha: `minioadmin` / `minioadmin`)
@@ -158,11 +160,13 @@ As três respostas estão em `sql/03_consultas.sql` e são executadas por
 
 Saídas geradas:
 
-| Arquivo                                    | Consulta |
-|--------------------------------------------|----------|
-| `output/a_top5_operadoras.csv`             | (a)      |
-| `output/b_faixa_etaria_top.csv`            | (b)      |
-| `output/c_beneficiarios_por_municipio.csv` | (c)      |
+| Arquivo                                    | Conteúdo                                  |
+|--------------------------------------------|-------------------------------------------|
+| `output/a_top5_operadoras.csv`             | (a) 5 maiores operadoras                  |
+| `output/b_faixa_etaria_top.csv`            | (b) faixa etária líder                    |
+| `output/c_beneficiarios_por_municipio.csv` | (c) municípios (decrescente)              |
+| `output/insight_operadoras.csv`            | ranking completo de operadoras (insights) |
+| `output/insight_faixa_etaria.csv`          | distribuição completa por faixa (insights)|
 
 ### Resultados (competência 2025-08)
 
@@ -203,6 +207,39 @@ Lista completa em `output/c_beneficiarios_por_municipio.csv`.
 
 ---
 
+## Dashboard (Streamlit)
+
+Uma camada de **visualização/BI** (equivalente a *QuickSight / Power BI /
+Databricks Dashboards*) consome a camada **Gold** curada — os CSVs de `output/` —
+e apresenta as 3 respostas do case junto com alguns **insights** extras.
+
+Sobe junto com o ambiente (serviço `streamlit` do `docker-compose`):
+
+```bash
+docker compose up -d --build streamlit
+```
+
+Acesso: **http://localhost:8501**
+
+O dashboard traz:
+
+- **KPIs**: total de beneficiários ativos, nº de operadoras, nº de municípios e
+  faixa etária líder.
+- **(a)** Ranking das operadoras + **concentração de mercado** (share do líder e
+  das 5 maiores).
+- **(b)** Distribuição completa por **faixa etária** (perfil demográfico), com a
+  faixa líder em destaque.
+- **(c)** Top municípios + tabela pesquisável dos 646 + **concentração
+  geográfica** (peso da capital e do top 10).
+
+> O dashboard lê apenas agregados já prontos (não reprocessa os 4,8M de
+> registros). Rode o pipeline antes (`docker compose exec spark python -m
+> src.run_pipeline`) para gerar/atualizar os CSVs — inclusive os de insight
+> (`insight_*.csv`), que habilitam os gráficos completos de operadoras e faixa
+> etária. Sem eles, o dashboard exibe apenas as respostas reduzidas do case.
+
+---
+
 ## Estrutura do projeto
 
 ```
@@ -225,8 +262,12 @@ Lista completa em `output/c_beneficiarios_por_municipio.csv`.
 │   ├── Dockerfile          # Airflow + CLI do Docker
 │   └── dags/
 │       └── pipeline_medallion_dag.py
+├── app/                    # dashboard Streamlit (camada de BI)
+│   ├── Dockerfile          # imagem enxuta (sem Spark/Java)
+│   ├── requirements.txt
+│   └── streamlit_app.py
 ├── notebooks/              # versão notebook (estilo Databricks)
-└── output/                 # resultados das consultas
+└── output/                 # resultados das consultas (consumidos pelo dashboard)
 ```
 
 ---

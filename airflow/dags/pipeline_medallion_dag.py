@@ -43,25 +43,25 @@ with DAG(
 ) as dag:
 
     bronze = BashOperator(
-        task_id="bronze",
+        task_id="bronze_ingestao_csv_raw",
         bash_command=step_cmd("bronze"),
         doc_md="Ingestão do CSV as-is para Delta (camada Bronze).",
     )
 
     silver = BashOperator(
-        task_id="silver",
+        task_id="silver_tipagem_mascaramento_cnpj",
         bash_command=step_cmd("silver"),
         doc_md="Tipagem, mascaramento de CNPJ e particionamento (camada Silver).",
     )
 
     gold = BashOperator(
-        task_id="gold",
+        task_id="gold_agregacoes_analiticas",
         bash_command=step_cmd("gold"),
         doc_md="Tabelas agregadas para consumo analítico (camada Gold).",
     )
 
     consultas = BashOperator(
-        task_id="consultas",
+        task_id="consultas_respostas_case",
         bash_command=step_cmd("queries"),
         doc_md="Executa as 3 consultas do case e salva os resultados em output/.",
     )

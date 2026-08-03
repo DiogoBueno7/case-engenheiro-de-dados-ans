@@ -24,6 +24,7 @@ nuvem da empresa (AWS Glue/Athena/S3/Redshift + Databricks/Spark) sem custo.
 | Object storage   | MinIO (S3-compatible)     | Amazon S3                             |
 | Consulta SQL     | Spark SQL                 | Amazon Athena / Databricks SQL        |
 | Camada curada    | Gold (Delta)              | Amazon Redshift                       |
+| Visualização/BI  | Streamlit                 | QuickSight / Power BI / Databricks     |
 
 Serviços do `docker-compose.yml`: `minio` (S3), `minio-init` (cria bucket, é
 one-shot e sai com código 0 — normal), `spark` (PySpark + Delta; motor de
@@ -34,11 +35,14 @@ processamento e alvo do `docker exec` do Airflow — fica vivo via `tail -f
 os event logs do volume `spark-events`), `postgres` (metastore do Airflow),
 `airflow-init` (migra schema + cria admin, one-shot, Exited 0 esperado),
 `airflow-webserver` (só a UI) e `airflow-scheduler` (agenda **e executa** as
-tasks, via LocalExecutor). Login: `admin` / `admin`.
+tasks, via LocalExecutor). Login: `admin` / `admin`. Há ainda `streamlit`
+(`case-streamlit`): dashboard/BI que lê os CSVs de `output/` (camada Gold) — não
+usa Spark/Java, imagem própria e enxuta em `app/`.
 
-Portas: **8888** JupyterLab · **9000/9001** MinIO API/console · **4040** Spark UI
-(pipeline, `case-spark`) · **4041** Spark UI (jobs do notebook, `case-jupyter`) ·
-**18080** Spark History Server (execuções finalizadas) · **8080** Airflow UI.
+Portas: **8501** Streamlit (dashboard) · **8888** JupyterLab · **9000/9001** MinIO
+API/console · **4040** Spark UI (pipeline, `case-spark`) · **4041** Spark UI (jobs
+do notebook, `case-jupyter`) · **18080** Spark History Server (execuções
+finalizadas) · **8080** Airflow UI.
 
 ## Comandos
 
@@ -75,8 +79,9 @@ src/           execução em Python (orquestra o SQL, não contém regra de neg�
   queries.py       roda as 3 consultas e salva em output/
   run_pipeline.py  runner Bronze->Silver->Gold->Consultas (aceita etapas como args)
 airflow/       Dockerfile (Airflow + docker CLI) + dags/pipeline_medallion_dag.py
+app/           dashboard Streamlit (BI): Dockerfile + requirements + streamlit_app.py
 notebooks/     pipeline_medallion.ipynb (versão estilo Databricks)
-output/        resultados das 3 consultas (CSV)
+output/        resultados das consultas + insights (CSV) — consumidos pelo dashboard
 data/          CSV bruto (não versionado)
 ```
 
@@ -102,6 +107,11 @@ data/          CSV bruto (não versionado)
   `docker exec case-spark`.
 - **Airflow não duplica lógica:** cada task faz `docker exec case-spark python -m
   src.run_pipeline <etapa>`.
+- **Streamlit desacoplado do Spark:** o dashboard (`app/`) só lê os CSVs de
+  `output/` (agregados da Gold) — imagem própria sem Java/Spark, sobe em segundos.
+  As 3 respostas do case (`a_`/`b_`/`c_`) e os insights (`insight_*`) são gerados
+  por `src/queries.py`. O app degrada com elegância: se os `insight_*.csv` não
+  existirem, cai para as versões reduzidas (top5 operadoras / top1 faixa).
 
 ## Armadilhas conhecidas (gotchas)
 

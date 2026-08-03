@@ -111,6 +111,20 @@ services:
         exec "$$SPARK_HOME/sbin/start-history-server.sh"
 
   # ----------------------------------------------------------------------------
+  # streamlit: dashboard/BI que consome a camada Gold (curada). Lê os CSVs já
+  # materializados em output/ — não precisa de Spark/Java. É o equivalente local
+  # a um Amazon QuickSight / Power BI / Databricks Dashboard lendo do warehouse.
+  # ----------------------------------------------------------------------------
+  streamlit:
+    build: ./app
+    container_name: case-streamlit
+    ports:
+      - "8501:8501"   # Dashboard (http://localhost:8501)
+    volumes:
+      - ./output:/app/output          # resultados da camada Gold (só leitura lógica)
+      - ./app/streamlit_app.py:/app/streamlit_app.py
+
+  # ----------------------------------------------------------------------------
   # postgres: banco de metadados do Airflow (DAGs, runs, tasks, conexões).
   # Substitui o SQLite do modo standalone — em produção o metastore do Airflow
   # é sempre um RDBMS concorrente (Postgres/MySQL). Aqui emula o RDS.
