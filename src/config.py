@@ -86,7 +86,8 @@ def get_spark(app_name: str = "case-ans-medallion") -> SparkSession:
     spark = configure_spark_with_delta_pip(
         builder, extra_packages=_S3_PACKAGES
     ).getOrCreate()
-    spark.sparkContext.setLogLevel("WARN")
+    # spark.sparkContext.setLogLevel("WARN")
+    spark.sparkContext.setLogLevel("ERROR")
     return spark
 
 

@@ -120,9 +120,22 @@ services:
     container_name: case-streamlit
     ports:
       - "8501:8501"   # Dashboard (http://localhost:8501)
+    environment:
+      # No Docker Desktop/Windows os eventos de inotify não atravessam o bind
+      # mount, então o watcher padrão nunca dispara. 'poll' faz o Streamlit
+      # checar o mtime periodicamente e detectar as alterações do host.
+      STREAMLIT_SERVER_FILE_WATCHER_TYPE: poll
+      # runOnSave fica FALSE de propósito: neste setup (Windows/Docker/WSL) o
+      # auto-rerun reinicia o servidor a cada save e segfaultava o container
+      # (Exit 139). Com false, ao salvar aparece o botão "Rerun" no topo — o
+      # app rerroda no lugar, sem restart e sem crash.
+      STREAMLIT_SERVER_RUN_ON_SAVE: "false"
     volumes:
       - ./output:/app/output          # resultados da camada Gold (só leitura lógica)
-      - ./app/streamlit_app.py:/app/streamlit_app.py
+      # Monta o diretório (não o arquivo único): bind de arquivo único no Windows
+      # prende o mount ao inode original; ao salvar (escrita atômica) o inode muda
+      # e o container fica preso na versão antiga. Montar a pasta evita isso.
+      - ./app:/app
 
   # ----------------------------------------------------------------------------
   # postgres: banco de metadados do Airflow (DAGs, runs, tasks, conexões).
