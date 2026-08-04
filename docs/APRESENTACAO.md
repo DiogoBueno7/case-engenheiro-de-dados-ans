@@ -34,21 +34,22 @@ rodam no Databricks** — bastaria trocar credenciais/caminhos do MinIO pelo S3 
 
 ## 3. Arquitetura
 
-![Arquitetura do pipeline](arquitetura.png)
+Fluxo dos dados pelas camadas Medallion (orquestrado pelo Airflow:
+bronze → silver → gold → consultas):
 
-```
-CSV (1,5 GB)
-   │  Spark SQL
-   ▼
-┌─────────── Data Lake (MinIO / S3) ───────────┐
-│  BRONZE   → Delta, dados as-is + auditoria    │
-│  SILVER   → Delta tipado, CNPJ mascarado,     │
-│             particionado por competência       │
-│  GOLD     → Delta agregado (1 tabela/pergunta) │
-└───────────────────────────────────────────────┘
-   │  3 consultas
-   ▼
-output/*.csv     (orquestrado pelo Airflow: bronze→silver→gold→consultas)
+```mermaid
+flowchart LR
+    CSV[CSV bruto ANS<br/>~1,5 GB / 4,8M linhas] -->|Spark SQL| B
+
+    subgraph LAKE[Data Lake - MinIO / S3]
+        B[BRONZE<br/>Delta - as-is<br/>+ auditoria]
+        S[SILVER<br/>Delta tipado<br/>CNPJ mascarado<br/>particionado por competência]
+        G[GOLD<br/>Delta agregado<br/>por operadora / faixa / município]
+    end
+
+    B -->|tipagem + mascaramento| S
+    S -->|agregações| G
+    G -->|3 consultas| Q[Resultados<br/>output/*.csv]
 ```
 
 **Camadas:**
@@ -237,6 +238,18 @@ warehouse (o equivalente ao Redshift).
 Reprocessei do zero (limpando o lake) e os resultados foram idênticos —
 determinismo, sinal de um pipeline confiável e sem efeitos colaterais de estado.
 
+**"Como você garante que os dados estão corretos / como valida a qualidade?"**
+Tem um notebook de **validação/reconciliação** (`notebooks/validacao_dados.ipynb`)
+que *não confia* na Gold: recalcula as respostas direto da Silver e reconcilia
+contra as tabelas Gold, os entregáveis em `output/*.csv` e os valores de referência
+do case. São 8 baterias de checagem (`PASS`/`FAIL` + `assert` final): integridade de
+volume (CSV = Bronze = Silver, 1:1), tipagem sem perda (o `CAST AS INT` não criou
+nulos a mais), mascaramento/LGPD (100% dos CNPJ mascarados), sanidade de valores
+(sem ativos negativos), Gold = recomputo independente da Silver, entregáveis = Gold,
+soma total idêntica entre Silver e as 3 Golds, e conferência contra os números de
+referência. A evolução é transformar isso num *gate* de qualidade no próprio pipeline
+(ex.: Great Expectations), barrando a promoção da camada em caso de falha.
+
 **"Como está montado o Airflow?"**
 Em **modo de produção**, não standalone: metadados em **Postgres**, serviços
 separados (`airflow-webserver` + `airflow-scheduler`) com **LocalExecutor**.
@@ -254,8 +267,10 @@ Localmente: Spark UI (4040), logs por task na UI do Airflow (8080), console do M
 - Carga **full** de uma competência (não incremental) — evolução clara é `MERGE`.
 - Airflow com **LocalExecutor** (single-node): bom para o case, mas para escala real
   seria Celery/Kubernetes Executor com Postgres gerenciado.
-- Sem testes automatizados de qualidade de dado (ex.: Great Expectations) — próximo
-  passo natural para validar tipos, nulos e faixas.
+- Validação de dados hoje é um **notebook de reconciliação** (`validacao_dados.ipynb`,
+  8 checagens) rodado manualmente; o próximo passo é integrá-la ao pipeline/CI como
+  gate de qualidade (ex.: Great Expectations / Soda) que barra a promoção da camada
+  em caso de falha.
 - Metastore Derby embutido (single-node) — em produção seria Glue Data Catalog /
   Unity Catalog.
 

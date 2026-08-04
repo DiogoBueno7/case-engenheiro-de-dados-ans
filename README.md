@@ -23,10 +23,7 @@ O mesmo código Spark/Delta e os mesmos scripts SQL rodam sem alteração no
 
 ## Arquitetura
 
-![Arquitetura do pipeline](docs/arquitetura.png)
-
-<details>
-<summary>Versão em texto (Mermaid)</summary>
+O diagrama abaixo mostra o **fluxo dos dados** pelas camadas Medallion:
 
 ```mermaid
 flowchart LR
@@ -42,8 +39,6 @@ flowchart LR
     S -->|agregações| G
     G -->|3 consultas| Q[Resultados<br/>output/*.csv]
 ```
-
-</details>
 
 ### Arquitetura técnica (componentes)
 
@@ -234,6 +229,31 @@ Lista completa em `output/c_beneficiarios_por_municipio.csv`.
 
 ---
 
+## Validação / qualidade de dados
+
+O notebook `notebooks/validacao_dados.ipynb` faz a **validação e reconciliação**
+dos dados de forma independente do pipeline: ele *não confia* na Gold — recalcula
+as respostas direto da Silver e reconcilia contra (1) as tabelas Gold, (2) os
+entregáveis em `output/*.csv` e (3) os valores de referência do case. São 8
+baterias de checagem, cada uma registrando um `PASS`/`FAIL` e um `assert` final
+que falha o notebook se algo quebrar:
+
+| # | Verificação                                                         |
+|---|---------------------------------------------------------------------|
+| V1 | Integridade de volume (CSV = Bronze = Silver, 1:1)                  |
+| V2 | Tipagem sem perda (o `CAST ... AS INT` não gerou nulos a mais)      |
+| V3 | Mascaramento/LGPD (100% dos CNPJ mascarados, raiz de 8 no máximo)   |
+| V4 | Sanidade de valores (sem quantidade de ativos negativa)            |
+| V5 | Gold == recomputo independente da Silver (zero divergências)       |
+| V6 | Entregáveis (`output/*.csv`) == Gold                               |
+| V7 | Consistência cruzada (soma total idêntica na Silver e nas 3 Golds) |
+| V8 | Conferência contra os valores de referência da competência 2025-08 |
+
+Rode-o no JupyterLab (http://localhost:8888) **depois** de executar o pipeline —
+ele lê os dados Delta das camadas direto do MinIO e os CSVs de `output/`.
+
+---
+
 ## Dashboard (Streamlit)
 
 Uma camada de **visualização/BI** (equivalente a *QuickSight / Power BI /
@@ -294,6 +314,8 @@ O dashboard traz:
 │   ├── requirements.txt
 │   └── streamlit_app.py
 ├── notebooks/              # versão notebook (estilo Databricks)
+│   ├── pipeline_medallion.ipynb   # pipeline Bronze->Silver->Gold + consultas
+│   └── validacao_dados.ipynb      # validação/reconciliação de qualidade de dado
 └── output/                 # resultados das consultas (consumidos pelo dashboard)
 ```
 
@@ -307,6 +329,9 @@ O dashboard traz:
 - **Particionamento** por competência na Silver e **pré-agregação** na Gold como
   estratégias de performance.
 - **Modularidade**: cada camada é um script SQL isolado; o Python só executa.
+- **Validação de dados**: notebook de reconciliação (`notebooks/validacao_dados.ipynb`)
+  que recalcula as respostas a partir da Silver e confere volume, tipagem,
+  mascaramento, agregações da Gold e os valores de referência (8 checagens).
 - **Orquestração**: DAG do Airflow com dependências, agendamento e retry,
   reaproveitando as mesmas etapas sem duplicar lógica.
 - **Portabilidade**: trocar MinIO por S3 real e Spark local por Databricks exige

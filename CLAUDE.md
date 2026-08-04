@@ -81,6 +81,8 @@ src/           execução em Python (orquestra o SQL, não contém regra de neg�
 airflow/       Dockerfile (Airflow + docker CLI) + dags/pipeline_medallion_dag.py
 app/           dashboard Streamlit (BI): Dockerfile + requirements + streamlit_app.py
 notebooks/     pipeline_medallion.ipynb (versão estilo Databricks)
+  validacao_dados.ipynb  validação/reconciliação (8 checagens: volume, tipagem,
+                         mascaramento, Gold vs. recomputo da Silver, valores de ref.)
 output/        resultados das consultas + insights (CSV) — consumidos pelo dashboard
 data/          CSV bruto (não versionado)
 ```

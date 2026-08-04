@@ -58,6 +58,9 @@ CSV 1,5GB ──Spark SQL──> BRONZE (Delta, texto puro + _ingested_at, _sour
   consulta rápida. Evita varrer 4,8M linhas por pergunta. É o papel do "Redshift".
 - **Como está o Airflow?** → Produção: **Postgres + webserver/scheduler separados +
   LocalExecutor**. Não é standalone.
+- **Como valida a qualidade do dado?** → Notebook `validacao_dados.ipynb`: recalcula
+  as respostas da Silver e reconcilia com Gold + `output/*.csv` + valores de
+  referência (8 checagens, `assert` no fim). Não confia na Gold.
 
 ## As 2 histórias de guerra (narrativa causa → efeito, não código)
 
@@ -81,5 +84,6 @@ docker compose exec spark python -m src.run_pipeline   # roda o pipeline complet
 
 - Carga **full** de uma competência (não incremental) → evolução é `MERGE`.
 - **LocalExecutor** single-node → escala real seria Celery/Kubernetes Executor.
-- Sem testes de qualidade de dado (ex.: Great Expectations) → próximo passo.
+- Validação de dado é notebook manual (`validacao_dados.ipynb`, 8 checagens) →
+  evolução é virar *gate* no pipeline/CI (ex.: Great Expectations).
 - Metastore Derby embutido → em produção seria Glue Data Catalog / Unity Catalog.
