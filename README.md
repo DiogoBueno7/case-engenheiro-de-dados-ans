@@ -26,7 +26,7 @@ O mesmo código Spark/Delta e os mesmos scripts SQL rodam sem alteração no
 O diagrama abaixo mostra o **fluxo dos dados** pelas camadas Medallion:
 
 ```mermaid
-flowchart LR
+flowchart TB
     CSV[CSV bruto ANS<br/>~1,5 GB / 4,8M linhas] -->|Spark SQL| B
 
     subgraph LAKE[Data Lake - MinIO / S3]
