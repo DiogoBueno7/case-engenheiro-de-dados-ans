@@ -2,6 +2,9 @@
 data/*.csv
 data/*.zip
 
+# Enunciado do case fornecido pela empresa — material de terceiros, não publicar
+Case - Engenheiro de dados 2.pdf
+
 # Saídas do pipeline
 output/
 lake/
