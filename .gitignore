@@ -29,3 +29,12 @@ __pycache__/
 .claude/
 
 /prints
+
+# Tooling de autoria da apresentação (gera os .pptx) — não é entregável do case
+scripts/
+
+# Artefatos binários de apresentação: decks .pptx (em qualquer pasta) e previews
+# de slides. A documentação de texto (docs/APRESENTACAO.md, CHEATSHEET.md e os
+# diagramas de arquitetura) continua versionada.
+*.pptx
+docs/_preview/

@@ -31,8 +31,11 @@ COMPETENCIA = "2025-08"
 # ---------------------------------------------------------------------------
 PRIMARY = "#2563EB"      # azul — cor institucional dos gráficos
 LEADER = "#F97316"       # laranja — destaque do item líder
-GRID = "rgba(15,23,42,0.06)"
-INK = "#1E293B"          # cor do texto
+# Cor do texto dos gráficos (rótulos de dados + nomes das categorias no eixo).
+# Clara de propósito: o tema é fixado em escuro (app/.streamlit/config.toml), então
+# o texto precisa ser claro para aparecer sobre o fundo preto. Antes usava um tom
+# quase preto (#1E293B), que sumia no fundo escuro.
+TEXT = "#E2E8F0"         # slate-200 — texto claro, legível no tema escuro
 FONT = "Inter, Segoe UI, system-ui, -apple-system, sans-serif"
 
 # Tooltip (hover) — caixa escura de alto contraste, legível tanto no tema claro
@@ -83,6 +86,13 @@ st.set_page_config(
 st.markdown(
     """
     <style>
+    /* Esconde a barra de "decoração" do topo (data-testid=stDecoration): um
+       gradiente laranja fino que o Streamlit desenha por padrão e que parece um
+       loading perpétuo. Não tem função — é puramente estética. */
+    [data-testid="stDecoration"] {
+        display: none;
+    }
+
     /* Reduz o respiro padrão no topo da página (o block-container vem com um
        padding-top grande). Sobe todo o conteúdo alguns pixels. */
     .block-container {
@@ -114,7 +124,7 @@ def _style(fig: go.Figure, height: int) -> go.Figure:
     fig.update_layout(
         height=height,
         template="plotly_white",
-        font=dict(family=FONT, size=13, color=INK),
+        font=dict(family=FONT, size=13, color=TEXT),
         margin=dict(l=8, r=28, t=12, b=8),
         separators=",.",  # decimal vírgula, milhar ponto (padrão brasileiro)
         plot_bgcolor="rgba(0,0,0,0)",
@@ -154,7 +164,7 @@ def barras_horizontais(
             text=d[value_col],
             texttemplate="%{text:,.0f}",
             textposition="outside",
-            textfont=dict(size=12, color=INK),
+            textfont=dict(size=12, color=TEXT),
             cliponaxis=False,
             hovertemplate=(
                 f"<b>%{{y}}</b><br>"
@@ -164,14 +174,15 @@ def barras_horizontais(
         )
     )
     _style(fig, height)
-    # Folga à direita para o rótulo externo não ser cortado.
+    # Eixo de valores oculto: com o rótulo de dados em cada barra, os ticks
+    # numéricos e a grade ficariam redundantes. Mantém-se só a folga à direita
+    # (range) para o rótulo externo não ser cortado.
     fig.update_xaxes(
-        title=value_title,
-        showgrid=True,
-        gridcolor=GRID,
+        title=None,
+        showgrid=False,
+        showticklabels=False,
         zeroline=False,
         range=[0, vmax * 1.18],
-        tickformat=",.0f",
     )
     fig.update_yaxes(title=None, showgrid=False, zeroline=False)
     return fig
@@ -457,7 +468,7 @@ with tab_b:
                 text=fx["qt_beneficiarios_ativos"],
                 texttemplate="%{text:,.0f}",
                 textposition="outside",
-                textfont=dict(size=11, color=INK),
+                textfont=dict(size=11, color=TEXT),
                 cliponaxis=False,
                 hovertemplate=(
                     "<b>%{x}</b><br>"
@@ -468,12 +479,13 @@ with tab_b:
         )
         _style(fig, height=420)
         fig.update_xaxes(title=None, showgrid=False, zeroline=False, tickangle=-40)
+        # Eixo de valores oculto: o rótulo em cada barra já traz o número, então
+        # os ticks e a grade horizontal seriam redundantes.
         fig.update_yaxes(
-            title="Beneficiários ativos",
-            showgrid=True,
-            gridcolor=GRID,
+            title=None,
+            showgrid=False,
+            showticklabels=False,
             zeroline=False,
-            tickformat=",.0f",
         )
         fig.update_layout(margin=dict(l=8, r=8, t=24, b=8))
         with st.container(border=True):
@@ -549,6 +561,80 @@ with tab_c:
                 )
                 + "</div>",
                 unsafe_allow_html=True,
+            )
+
+        # Tabela completa (todos os municípios) — a resposta literal do case:
+        # "liste, de forma decrescente, a quantidade de beneficiários por
+        # município". Recolhível (não polui a visão de topo) e paginada, pois são
+        # centenas de linhas. O Streamlit não tem paginação nativa em tabela;
+        # implementamos com um seletor de página fatiando o DataFrame já ordenado.
+        with st.expander(f"📋 Tabela completa — todos os {fmt(n_mun)} municípios (decrescente)"):
+            tabela = mun.reset_index(drop=True).copy()
+            tabela.insert(0, "Posição", tabela.index + 1)
+            tabela["Participação"] = (
+                tabela["qt_beneficiarios_ativos"] / total_mun * 100
+            )
+
+            # Ao trocar o tamanho da página, volta para a 1ª. Sem isso, o valor
+            # guardado em session_state (ex.: página 13 com 50 linhas) podia ficar
+            # acima do novo total de páginas (ex.: 3 páginas com 250 linhas) e o
+            # number_input estourava StreamlitAPIException — travando a aba (c).
+            def _reset_mun_pagina() -> None:
+                st.session_state["mun_pagina"] = 1
+
+            col_cfg, col_nav = st.columns([1, 2], gap="large")
+            with col_cfg:
+                por_pagina = st.selectbox(
+                    "Linhas por página",
+                    options=[25, 50, 100, 250],
+                    index=1,
+                    key="mun_por_pagina",
+                    on_change=_reset_mun_pagina,
+                )
+            n_paginas = max(1, -(-n_mun // por_pagina))  # divisão para cima
+
+            # O widget lê a página de session_state (por isso NÃO passamos `value`,
+            # que conflita com a `key` e reemite warning a cada rerun). Inicializa
+            # uma vez e trava defensivamente no intervalo [1, n_paginas] ANTES de
+            # instanciar o widget — garante que max_value nunca seja violado.
+            pagina_atual = int(st.session_state.get("mun_pagina", 1))
+            st.session_state["mun_pagina"] = min(max(pagina_atual, 1), n_paginas)
+            with col_nav:
+                pagina = st.number_input(
+                    f"Página (1 a {n_paginas})",
+                    min_value=1,
+                    max_value=n_paginas,
+                    step=1,
+                    key="mun_pagina",
+                )
+
+            ini = (int(pagina) - 1) * por_pagina
+            fim = ini + por_pagina
+            fatia = tabela.iloc[ini:fim].copy()
+            # Formatação BR só na exibição (mantém os tipos numéricos na origem).
+            fatia["Beneficiários ativos"] = fatia["qt_beneficiarios_ativos"].map(fmt)
+            fatia["Participação"] = fatia["Participação"].map(
+                lambda p: f"{p:.2f}%".replace(".", ",")
+            )
+            fatia = fatia.rename(
+                columns={
+                    "cd_municipio": "Cód. IBGE",
+                    "nm_municipio": "Município",
+                }
+            )[
+                [
+                    "Posição",
+                    "Cód. IBGE",
+                    "Município",
+                    "Beneficiários ativos",
+                    "Participação",
+                ]
+            ]
+
+            st.dataframe(fatia, use_container_width=True, hide_index=True)
+            st.caption(
+                f"Exibindo {fmt(ini + 1)}–{fmt(min(fim, n_mun))} de {fmt(n_mun)} "
+                f"municípios · página {int(pagina)} de {n_paginas}."
             )
     else:
         st.info("Sem dados de municípios em `output/`.")

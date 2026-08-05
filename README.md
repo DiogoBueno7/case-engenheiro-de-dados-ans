@@ -130,6 +130,7 @@ docker compose exec spark python -m src.run_pipeline
 - **Console do MinIO** (ver os buckets bronze/silver/gold): http://localhost:9001
   (usuário/senha: `minioadmin` / `minioadmin`)
 - **Spark UI** (durante um job): http://localhost:4040
+- **Spark History Server** (Spark UI de execuções já finalizadas): http://localhost:18080
 
 Rodar apenas uma etapa:
 
@@ -280,10 +281,12 @@ O dashboard traz:
   geográfica** (peso da capital e do top 10).
 
 > O dashboard lê apenas agregados já prontos (não reprocessa os 4,8M de
-> registros). Rode o pipeline antes (`docker compose exec spark python -m
-> src.run_pipeline`) para gerar/atualizar os CSVs — inclusive os de insight
-> (`insight_*.csv`), que habilitam os gráficos completos de operadoras e faixa
-> etária. Sem eles, o dashboard exibe apenas as respostas reduzidas do case.
+> registros). Os `insight_*.csv` são **parte do pipeline** — consultas de
+> `sql/03_consultas.sql` executadas por `src/queries.py` e **regeneradas a cada
+> execução**, não artefatos manuais. São eles que alimentam os gráficos
+> completos: o Top-10 de operadoras e a **pirâmide etária das 17 faixas**. O
+> fallback para as respostas reduzidas do case (top5 / top1) existe só como
+> **rede de segurança**, caso os arquivos faltem — não é o estado normal.
 
 ---
 
@@ -316,6 +319,7 @@ O dashboard traz:
 ├── notebooks/              # versão notebook (estilo Databricks)
 │   ├── pipeline_medallion.ipynb   # pipeline Bronze->Silver->Gold + consultas
 │   └── validacao_dados.ipynb      # validação/reconciliação de qualidade de dado
+├── docs/                   # apresentação/defesa (APRESENTACAO.md), diagramas
 └── output/                 # resultados das consultas (consumidos pelo dashboard)
 ```
 

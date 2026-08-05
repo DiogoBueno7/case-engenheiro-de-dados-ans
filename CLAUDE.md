@@ -123,9 +123,14 @@ data/          CSV bruto (não versionado)
   src.run_pipeline <etapa>`.
 - **Streamlit desacoplado do Spark:** o dashboard (`app/`) só lê os CSVs de
   `output/` (agregados da Gold) — imagem própria sem Java/Spark, sobe em segundos.
-  As 3 respostas do case (`a_`/`b_`/`c_`) e os insights (`insight_*`) são gerados
-  por `src/queries.py`. O app degrada com elegância: se os `insight_*.csv` não
-  existirem, cai para as versões reduzidas (top5 operadoras / top1 faixa).
+  As 3 respostas do case (`a_`/`b_`/`c_`) **e** os insights (`insight_operadoras`
+  / `insight_faixa_etaria`) são consultas de `sql/03_consultas.sql`, executadas por
+  `src/queries.py` e **regeneradas a cada rodada do pipeline** — os `insight_*.csv`
+  não são artefatos manuais nem congelados. São eles que alimentam os gráficos
+  completos do dashboard: o Top-10 de operadoras (aba a) e a **pirâmide etária das
+  17 faixas** (aba b). O fallback do app é apenas uma **rede de segurança**: se os
+  `insight_*.csv` faltarem, as abas caem para as versões reduzidas (top5 operadoras
+  / top1 faixa) em vez de quebrar — não é um estado esperado da operação normal.
 
 ## Armadilhas conhecidas (gotchas)
 
@@ -140,6 +145,11 @@ data/          CSV bruto (não versionado)
   webserver/scheduler. O webserver tem `start_period: 60s` no healthcheck.
 - **`minio-init` e `airflow-init` saírem (Exited 0) é esperado** — são containers
   de tarefa única.
+- **Não comentar as consultas de insight** (`insight_operadoras` /
+  `insight_faixa_etaria`) em `sql/03_consultas.sql`. Se elas saírem, o pipeline
+  para de gerar os `insight_*.csv` e o dashboard silenciosamente cai para o modo
+  reduzido (some a pirâmide etária, o Top-10 vira Top-5) — os CSVs versionados em
+  `output/` viram órfãos que ninguém consegue reproduzir. São parte do entregável.
 
 ## Resultados de referência (competência 2025-08)
 

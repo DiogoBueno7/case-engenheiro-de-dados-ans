@@ -1,0 +1,15 @@
+# Tema fixado em ESCURO para o dashboard.
+#
+# Motivo: os gráficos Plotly desenham os rótulos de dados (os números sobre as
+# barras) com uma cor fixa definida no Python. O Streamlit 1.38 não expõe ao
+# Python qual tema o usuário selecionou no menu (isso só chegou no 1.46 via
+# st.context.theme), então não dá para escolher a cor do rótulo em runtime.
+# Fixando o tema aqui, o fundo é sempre escuro e os rótulos são sempre claros —
+# ficam legíveis de forma determinística (nada de texto preto sobre fundo preto).
+#
+# Montado no container via bind-mount ./app:/app (docker-compose), então o
+# Streamlit lê /app/.streamlit/config.toml automaticamente.
+[theme]
+base = "dark"
+primaryColor = "#2563EB"        # azul institucional dos gráficos
+font = "sans serif"

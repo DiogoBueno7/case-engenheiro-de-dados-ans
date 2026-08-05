@@ -1,3 +1,10 @@
 streamlit==1.38.0
 pandas==2.2.2
 plotly==5.24.1
+# numpy/pyarrow FIXADOS de propósito: o Streamlit 1.38.0 serializa as tabelas
+# (st.dataframe) via Arrow, e o build vinha puxando as versões mais recentes
+# (numpy 2.4 / pyarrow 25), um combo de ABI não testado com essa versão do
+# Streamlit que causava SEGFAULT (container saía com código 139) ao paginar a
+# tabela de municípios. Estas versões são contemporâneas ao Streamlit 1.38.0.
+numpy==1.26.4
+pyarrow==17.0.0

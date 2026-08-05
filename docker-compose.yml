@@ -56,7 +56,7 @@ services:
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
       LAKE_BUCKET: ${LAKE_BUCKET:-lakehouse}
       LAKE_ROOT: s3a://${LAKE_BUCKET:-lakehouse}
-      CSV_PATH: /app/data/pda-024-icb-SP-2025_08.csv
+      CSV_PATH: ${CSV_PATH:-/app/data/pda-024-icb-SP-2025_08.csv}
     ports:
       - "4040:4040"   # Spark UI (quando um job está rodando)
     volumes: &spark-volumes
