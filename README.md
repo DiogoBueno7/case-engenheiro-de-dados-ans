@@ -108,7 +108,7 @@ docker compose up -d --build
 
 > **Se o `up` abortar com um erro parecido com este:**
 >
-> ![Erro do preflight quando a base não está em data/](prints/em_caso_desse_erro.png)
+> ![Erro do preflight quando a base não está em data/](docs/img/em_caso_desse_erro.png)
 >
 > a base não está em `data/` — o `preflight` não encontrou `data/pda-024-icb-SP-2025_08.csv`. Volte ao **Passo 2**, baixe a base e rode o `up` novamente.
 
