@@ -20,27 +20,7 @@ O mesmo código Spark/Delta e os mesmos scripts SQL rodam sem alteração no
 **Databricks** (basta apontar os caminhos para o S3 real).
 
 ---
-
-## Arquitetura
-
-O diagrama abaixo mostra o **fluxo dos dados** pelas camadas Medallion:
-
-```mermaid
-flowchart TB
-    CSV[CSV bruto ANS<br/>~1,5 GB / 4,8M linhas] -->|Spark SQL| B
-
-    subgraph LAKE[Data Lake - MinIO / S3]
-        B[BRONZE<br/>Delta - as-is<br/>+ auditoria]
-        S[SILVER<br/>Delta tipado<br/>CNPJ mascarado<br/>particionado por competência]
-        G[GOLD<br/>Delta agregado<br/>por operadora / faixa / município]
-    end
-
-    B -->|tipagem + mascaramento| S
-    S -->|agregações| G
-    G -->|3 consultas| Q[Resultados<br/>output/*.csv]
-```
-
-### Arquitetura técnica (componentes)
+### Arquitetura
 
 O diagrama acima mostra o **fluxo dos dados** (camadas Medallion). Este mostra **como
 o pipeline roda de fato** — a stack que emula, localmente, o ambiente de produção na
