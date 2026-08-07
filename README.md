@@ -75,7 +75,14 @@ Pré-requisitos: **Docker** e **Docker Compose**.
 > 💡 Rode todos os comandos `docker compose` a seguir **de dentro da pasta do
 > projeto** (a mesma onde está o `docker-compose.yml`).
 
-**Passo 1 — baixe a base** e coloque em `data/` (só isso é manual). O CSV bruto
+**Passo 1 — clone o repositório** e entre na pasta:
+
+```bash
+git clone https://github.com/DiogoBueno7/case-engenheiro-de-dados-ans.git
+cd case-engenheiro-de-dados-ans
+```
+
+**Passo 2 — baixe a base** e coloque em `data/` (só isso é manual). O CSV bruto
 (≈ 1,5 GB, `4.830.707` registros) **não é versionado** no Git:
 
 **⬇️ [pda-024-icb-SP-2025_08.zip](https://ftp.dadosabertos.ans.gov.br/FTP/PDA/informacoes_consolidadas_de_beneficiarios-024/202508/pda-024-icb-SP-2025_08.zip)** →
@@ -86,7 +93,7 @@ O **nome exato importa**: o serviço `preflight` valida esse arquivo na subida
 [Dados Abertos da ANS](https://dadosabertos.ans.gov.br/). Para outra competência/UF,
 ajuste o caminho em `.env` / `src/config.py` (placeholder `{{CSV_PATH}}`) — o SQL não muda.
 
-**Passo 2 — suba tudo com um comando:**
+**Passo 3 — suba tudo com um comando:**
 
 ```bash
 # copie o exemplo de variáveis de ambiente
@@ -103,7 +110,7 @@ docker compose up -d --build
 >
 > ![Erro do preflight quando a base não está em data/](prints/em_caso_desse_erro.png)
 >
-> a base não está em `data/` — o `preflight` não encontrou `data/pda-024-icb-SP-2025_08.csv`. Volte ao **Passo 1**, baixe a base e rode o `up` novamente.
+> a base não está em `data/` — o `preflight` não encontrou `data/pda-024-icb-SP-2025_08.csv`. Volte ao **Passo 2**, baixe a base e rode o `up` novamente.
 
 Pronto. Acesse:
 
