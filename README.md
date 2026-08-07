@@ -94,6 +94,7 @@ O arquivo bruto **não é versionado** no Git (≈ **1,5 GB**, `4.830.707` regis
 por isso, após clonar o repositório, é preciso baixá-lo separadamente.
 
 - **Fonte:** link completo: "https://ftp.dadosabertos.ans.gov.br/FTP/PDA/informacoes_consolidadas_de_beneficiarios-024/202508/pda-024-icb-SP-2025_08.zip"
+  
   Dados Abertos da ANS — <https://dadosabertos.ans.gov.br/> (seção de
   *Informações Consolidadas de Beneficiários*).
 - **Arquivo esperado:** `pda-024-icb-SP-2025_08.csv` — beneficiários de São Paulo,
