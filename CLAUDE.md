@@ -76,9 +76,11 @@ docker compose exec airflow-scheduler airflow dags test pipeline_medallion_ans 2
 
 # UI do Airflow em http://localhost:8080 — login fixo: admin / admin
 
-# Zerar o data lake (MinIO) para reprocessar do zero
-docker run --rm --entrypoint sh --network case_engenheiro_de_dados_default \
-  minio/mc:latest -c "mc alias set local http://minio:9000 minioadmin minioadmin && \
+# Zerar o data lake (MinIO) para reprocessar do zero. Usa `docker compose run` no
+# serviço minio-init (imagem minio/mc), que já entra na rede do projeto — sem
+# hardcodar o nome da rede (que varia com a pasta do clone).
+docker compose run --rm --entrypoint sh minio-init \
+  -c "mc alias set local http://minio:9000 minioadmin minioadmin && \
   mc rm --recursive --force local/lakehouse/"
 ```
 
@@ -132,9 +134,12 @@ data/          CSV bruto (não versionado)
   SQLite não suporta a concorrência dos 3 componentes e o webserver não completava
   o boot (a 8080 nunca entrava em LISTEN). Como as tasks rodam no processo do
   scheduler (LocalExecutor), é o **scheduler** que monta o `docker.sock` para o
-  `docker exec case-spark`.
-- **Airflow não duplica lógica:** cada task faz `docker exec case-spark python -m
-  src.run_pipeline <etapa>`.
+  `docker exec` no container do Spark.
+- **Airflow não duplica lógica:** cada task faz `docker exec <container do spark>
+  python -m src.run_pipeline <etapa>`. O container **não** é referenciado por nome
+  fixo (`case-spark` foi removido): o DAG o resolve em runtime pelo label do
+  Compose (`com.docker.compose.service=spark`), então funciona em qualquer pasta/
+  projeto onde o repo seja clonado, sem colisão de nomes entre clones.
 - **Streamlit desacoplado do Spark:** o dashboard (`app/`) só lê os CSVs de
   `output/` (agregados da Gold) — imagem própria sem Java/Spark, sobe em segundos.
   As 3 respostas do case (`a_`/`b_`/`c_`) **e** os insights (`insight_operadoras`

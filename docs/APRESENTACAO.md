@@ -146,7 +146,8 @@ Esta seção é o coração da defesa: mostra depuração real, não um caminho 
   (`postgres` healthy → `airflow-init` Exited 0 → webserver/scheduler).
 - **Detalhe fino:** como as tasks rodam no processo do **scheduler** (LocalExecutor),
   é ele — e não o webserver — que monta o `docker.sock` para disparar o
-  `docker exec case-spark`.
+  `docker exec` no container do Spark (resolvido pelo label do Compose, não por
+  nome fixo — assim o repo roda em qualquer pasta/clone sem colisão de nomes).
 - **Lição:** o `standalone` é ótimo pra demo, mas SQLite não aguenta orquestração
   concorrente; o padrão de produção (Postgres + serviços separados) é mais robusto
   e foi o que adotei.

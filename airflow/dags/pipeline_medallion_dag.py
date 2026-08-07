@@ -2,7 +2,7 @@
 DAG de orquestração do pipeline Medallion (ANS Beneficiários SP).
 
 Cada etapa vira uma task que dispara o mesmo código Spark/SQL já existente,
-executando-o no container `case-spark` via `docker exec`. A lógica de
+executando-o no container do serviço `spark` via `docker exec`. A lógica de
 transformação continua 100% nos scripts SQL (sql/) — o Airflow só orquestra:
 ordem, dependências, agendamento mensal, retry e observabilidade.
 
@@ -17,12 +17,30 @@ import pendulum
 from airflow.models.dag import DAG
 from airflow.operators.bash import BashOperator
 
-SPARK_CONTAINER = "case-spark"
+# Serviço do Compose (NÃO um nome de container fixo). O container é resolvido em
+# tempo de execução pelo label que o Compose atribui — assim o DAG funciona
+# independentemente da pasta/projeto em que o repo foi clonado (o Compose nomeia
+# os containers como `<projeto>-spark-1`, sem `container_name` fixo). Como as
+# portas do host impedem duas stacks simultâneas, há sempre um único `spark`
+# rodando, então o filtro por label resolve para o container certo.
+SPARK_SERVICE = "spark"
 
 
 def step_cmd(step: str) -> str:
-    """Comando que executa uma etapa do pipeline dentro do container Spark."""
-    return f"docker exec {SPARK_CONTAINER} python -m src.run_pipeline {step}"
+    """Comando que executa uma etapa do pipeline dentro do container Spark.
+
+    Resolve o container do serviço `spark` pelo label do Compose (evita
+    `container_name` fixo, que colidia entre clones do repo). Sem chaves de
+    Go-template (`{{ }}`) de propósito: o BashOperator renderiza o comando com
+    Jinja e elas seriam interpretadas.
+    """
+    return (
+        f"CID=$(docker ps -q --filter label=com.docker.compose.service={SPARK_SERVICE} | head -n1); "
+        'if [ -z "$CID" ]; then '
+        f"echo \"Container do servico '{SPARK_SERVICE}' nao encontrado (a stack esta de pe?)\"; "
+        "exit 1; fi; "
+        f'docker exec "$CID" python -m src.run_pipeline {step}'
+    )
 
 
 default_args = {

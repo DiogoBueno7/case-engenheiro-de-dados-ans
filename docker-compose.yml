@@ -7,9 +7,13 @@ services:
   # do Spark. ./data é bind mount (não é copiado p/ imagem), por isso a checagem é
   # na subida e não no build. Trocar de competência exige ajustar o nome abaixo.
   # ----------------------------------------------------------------------------
+  #
+  # NOTA sobre nomes de container: NENHUM serviço fixa `container_name`. O Compose
+  # nomeia por projeto (`<pasta>-<serviço>-<n>`), então dois clones do repo em
+  # pastas diferentes não colidem — e um container parado nunca bloqueia o nome de
+  # outro. (Antes, os nomes fixos `case-*` conflitavam entre clones, mesmo desligados.)
   preflight:
     image: busybox:latest
-    container_name: case-preflight
     volumes:
       - ./data:/data:ro
     command:
@@ -30,7 +34,6 @@ services:
   # ----------------------------------------------------------------------------
   minio:
     image: minio/minio:latest
-    container_name: case-minio
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
@@ -51,7 +54,6 @@ services:
   # ----------------------------------------------------------------------------
   minio-init:
     image: minio/mc:latest
-    container_name: case-minio-init
     depends_on:
       minio:
         condition: service_healthy
@@ -65,13 +67,13 @@ services:
   # ----------------------------------------------------------------------------
   # spark: motor de processamento (PySpark + Delta Lake).
   # É o equivalente local ao Databricks/Glue: roda o ETL das camadas Medallion.
-  # É o alvo do `docker exec case-spark ...` disparado pelas tasks do Airflow;
-  # por isso o container fica vivo com `tail -f /dev/null` (o JupyterLab, que
-  # antes o mantinha de pé, agora vive no serviço dedicado `jupyter`).
+  # É o alvo do `docker exec` disparado pelas tasks do Airflow (que resolve o
+  # container do serviço `spark` pelo label do Compose, não por nome fixo); por
+  # isso o container fica vivo com `tail -f /dev/null` (o JupyterLab, que antes o
+  # mantinha de pé, agora vive no serviço dedicado `jupyter`).
   # ----------------------------------------------------------------------------
   spark:
     build: .
-    container_name: case-spark
     depends_on:
       preflight:
         condition: service_completed_successfully
@@ -114,7 +116,6 @@ services:
   # ----------------------------------------------------------------------------
   pipeline:
     build: .
-    container_name: case-pipeline
     depends_on:
       preflight:
         condition: service_completed_successfully
@@ -147,7 +148,6 @@ services:
   # ----------------------------------------------------------------------------
   jupyter:
     build: .
-    container_name: case-jupyter
     depends_on:
       preflight:
         condition: service_completed_successfully
@@ -168,7 +168,6 @@ services:
   # ----------------------------------------------------------------------------
   spark-history:
     build: .
-    container_name: case-spark-history
     environment:
       SPARK_NO_DAEMONIZE: "1"   # roda em foreground (o container é o próprio processo)
       SPARK_HISTORY_OPTS: "-Dspark.history.fs.logDirectory=file:///spark-events -Dspark.history.ui.port=18080"
@@ -190,7 +189,6 @@ services:
   # ----------------------------------------------------------------------------
   streamlit:
     build: ./app
-    container_name: case-streamlit
     # Só sobe DEPOIS que o pipeline one-shot termina com sucesso: garante que
     # output/ já está populado quando o dashboard inicia. Elimina o antigo
     # retrabalho (subir vazio -> rodar pipeline -> reiniciar o container).
@@ -223,7 +221,6 @@ services:
   # ----------------------------------------------------------------------------
   postgres:
     image: postgres:16-alpine
-    container_name: case-postgres
     environment:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
@@ -243,7 +240,6 @@ services:
   # ----------------------------------------------------------------------------
   airflow-init:
     build: ./airflow
-    container_name: case-airflow-init
     depends_on:
       postgres:
         condition: service_healthy
@@ -270,7 +266,6 @@ services:
   # ----------------------------------------------------------------------------
   airflow-webserver:
     build: ./airflow
-    container_name: case-airflow-webserver
     depends_on:
       airflow-init:
         condition: service_completed_successfully
@@ -293,12 +288,12 @@ services:
 
   # ----------------------------------------------------------------------------
   # airflow-scheduler: agenda e EXECUTA as tasks (LocalExecutor). Como cada task
-  # é um `docker exec case-spark ...`, precisa do socket do Docker + CLI (já na
-  # imagem). É aqui que a orquestração do pipeline acontece de fato.
+  # é um `docker exec` no container do serviço `spark` (resolvido dinamicamente
+  # pelo label do Compose, não por nome fixo), precisa do socket do Docker + CLI
+  # (já na imagem). É aqui que a orquestração do pipeline acontece de fato.
   # ----------------------------------------------------------------------------
   airflow-scheduler:
     build: ./airflow
-    container_name: case-airflow-scheduler
     depends_on:
       airflow-init:
         condition: service_completed_successfully
