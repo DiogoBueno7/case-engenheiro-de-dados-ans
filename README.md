@@ -68,33 +68,6 @@ flowchart TB
 
 ---
 
-## Dados (como obter)
-
-O arquivo bruto **não é versionado** no Git (≈ **1,5 GB**, `4.830.707` registros) —
-por isso, após clonar o repositório, é preciso baixá-lo separadamente.
-
-**⬇️ Download direto (clique):**
-<https://ftp.dadosabertos.ans.gov.br/FTP/PDA/informacoes_consolidadas_de_beneficiarios-024/202508/pda-024-icb-SP-2025_08.zip>
-
-Depois de baixar, **descompacte o `.zip`** e coloque o `.csv` em `data/`:
-
-```
-data/pda-024-icb-SP-2025_08.csv
-```
-
-- **Fonte oficial:** Dados Abertos da ANS — <https://dadosabertos.ans.gov.br/>
-  (seção de *Informações Consolidadas de Beneficiários*).
-- **Arquivo esperado:** `pda-024-icb-SP-2025_08.csv` — beneficiários de São Paulo,
-  competência **2025-08**. UTF-8, separador `;`, campos entre aspas.
-- **Nome exato importa:** o ambiente valida esse arquivo na subida (serviço
-  `preflight`); se ele faltar, o `docker compose up` **aborta com mensagem clara**
-  em vez de falhar no meio do processamento.
-
-> Para reproduzir com outra competência/UF, basta ajustar o caminho em
-> `.env` / `src/config.py` (placeholder `{{CSV_PATH}}`) — o SQL não muda.
-
----
-
 ## Como executar
 
 Pré-requisitos: **Docker** e **Docker Compose**.
@@ -102,12 +75,16 @@ Pré-requisitos: **Docker** e **Docker Compose**.
 > 💡 Rode todos os comandos `docker compose` a seguir **de dentro da pasta do
 > projeto** (a mesma onde está o `docker-compose.yml`).
 
-**Passo 1 — baixe a base** e coloque em `data/` (só isso é manual):
-https://ftp.dadosabertos.ans.gov.br/FTP/PDA/informacoes_consolidadas_de_beneficiarios-024/202508/pda-024-icb-SP-2025_08.zip
+**Passo 1 — baixe a base** e coloque em `data/` (só isso é manual). O CSV bruto
+(≈ 1,5 GB, `4.830.707` registros) **não é versionado** no Git:
 
 **⬇️ [pda-024-icb-SP-2025_08.zip](https://ftp.dadosabertos.ans.gov.br/FTP/PDA/informacoes_consolidadas_de_beneficiarios-024/202508/pda-024-icb-SP-2025_08.zip)** →
 descompacte → `data/pda-024-icb-SP-2025_08.csv`
-(detalhes em **[Dados (como obter)](#dados-como-obter)**).
+
+O **nome exato importa**: o serviço `preflight` valida esse arquivo na subida
+(São Paulo, competência 2025-08; UTF-8, separador `;`, campos entre aspas). Fonte:
+[Dados Abertos da ANS](https://dadosabertos.ans.gov.br/). Para outra competência/UF,
+ajuste o caminho em `.env` / `src/config.py` (placeholder `{{CSV_PATH}}`) — o SQL não muda.
 
 **Passo 2 — suba tudo com um comando:**
 
@@ -120,22 +97,13 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-> **Como funciona a ordem:** o `up` primeiro valida que a base está em `data/`
-> (serviço `preflight` — se faltar, **aborta aqui** com mensagem clara). Em
-> seguida roda o pipeline num container one-shot (`pipeline`) e, quando ele
-> termina, sobe o **Streamlit já com os dados** — sem estado vazio e sem precisar
-> reiniciar nada. Na **primeira** vez o pipeline processa os 4,8M de registros, então
-> o `up` **fica bloqueado alguns minutos** até concluir. Para acompanhar, em outro
-> terminal:
+> **Como funciona a ordem:** o `up` valida a base em `data/` (serviço `preflight` — se faltar, **aborta**; veja a nota abaixo), roda o `pipeline` one-shot e sobe o **Streamlit já com os dados**; na 1ª vez leva alguns minutos (4,8M de registros — acompanhe com `docker compose logs -f pipeline`) e, nas próximas, **pula o reprocessamento** se os 5 CSVs da Gold já existem em `output/` (para forçar, apague `output/*.csv`).
+
+> **Se o `up` abortar com um erro parecido com este:**
 >
-> ```bash
-> docker compose logs -f pipeline
-> ```
+> ![Erro do preflight quando a base não está em data/](prints/em_caso_desse_erro.png)
 >
-> **Roda só se necessário:** se os 5 CSVs da Gold já existem em `output/`, o
-> `pipeline` **pula o reprocessamento** — do 2º `up` em diante o ambiente sobe em
-> segundos. Para **forçar** um reprocesso, apague `output/*.csv` ou rode o comando
-> manual (veja abaixo).
+> a base não está em `data/` — o `preflight` não encontrou `data/pda-024-icb-SP-2025_08.csv`. Volte ao **Passo 1**, baixe a base e rode o `up` novamente.
 
 Pronto. Acesse:
 
