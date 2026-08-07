@@ -120,6 +120,7 @@ data/pda-024-icb-SP-2025_08.csv
 Pré-requisitos: **Docker** e **Docker Compose**.
 
 **Passo 1 — baixe a base** e coloque em `data/` (só isso é manual):
+https://ftp.dadosabertos.ans.gov.br/FTP/PDA/informacoes_consolidadas_de_beneficiarios-024/202508/pda-024-icb-SP-2025_08.zip
 
 **⬇️ [pda-024-icb-SP-2025_08.zip](https://ftp.dadosabertos.ans.gov.br/FTP/PDA/informacoes_consolidadas_de_beneficiarios-024/202508/pda-024-icb-SP-2025_08.zip)** →
 descompacte → `data/pda-024-icb-SP-2025_08.csv`
@@ -128,7 +129,7 @@ descompacte → `data/pda-024-icb-SP-2025_08.csv`
 **Passo 2 — suba tudo com um comando:**
 
 ```bash
-# (opcional) copie o exemplo de variáveis de ambiente
+# copie o exemplo de variáveis de ambiente
 cp .env.example .env
 
 # Um comando faz tudo, em ordem: valida a base -> build -> roda o pipeline
@@ -145,6 +146,7 @@ docker compose up -d --build
 > terminal:
 >
 > ```bash
+# não se esqueça de estar na mesma pasta do projeto
 > docker compose logs -f pipeline
 > ```
 >
