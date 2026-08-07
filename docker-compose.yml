@@ -1,5 +1,30 @@
 services:
   # ----------------------------------------------------------------------------
+  # preflight: guarda de sanidade. Antes de QUALQUER coisa subir, verifica que a
+  # base bruta da ANS está em data/. Se faltar, sai com código 1 e uma mensagem
+  # clara — como spark/pipeline/streamlit dependem dele (service_completed_
+  # successfully), o `docker compose up` ABORTA aqui em vez de falhar lá no fundo
+  # do Spark. ./data é bind mount (não é copiado p/ imagem), por isso a checagem é
+  # na subida e não no build. Trocar de competência exige ajustar o nome abaixo.
+  # ----------------------------------------------------------------------------
+  preflight:
+    image: busybox:latest
+    container_name: case-preflight
+    volumes:
+      - ./data:/data:ro
+    command:
+      - sh
+      - -c
+      - |
+        if [ ! -f /data/pda-024-icb-SP-2025_08.csv ]; then
+          echo '' >&2
+          echo 'ERRO: base nao encontrada em data/pda-024-icb-SP-2025_08.csv' >&2
+          echo 'Baixe a base da ANS (veja README > Dados) e coloque em data/ antes de subir.' >&2
+          exit 1
+        fi
+        echo 'Base encontrada em data/. Prosseguindo.'
+
+  # ----------------------------------------------------------------------------
   # MinIO: object storage compatível com S3 -> emula o Amazon S3 (o "data lake").
   # Buckets bronze/silver/gold vivem aqui, exatamente como viveriam no S3 da AWS.
   # ----------------------------------------------------------------------------
@@ -48,6 +73,8 @@ services:
     build: .
     container_name: case-spark
     depends_on:
+      preflight:
+        condition: service_completed_successfully
       minio:
         condition: service_healthy
     environment: &spark-env
@@ -70,6 +97,50 @@ services:
     command: ["tail", "-f", "/dev/null"]   # mantém o container vivo p/ o docker exec do Airflow
 
   # ----------------------------------------------------------------------------
+  # pipeline: job ONE-SHOT que roda o ETL completo (Bronze -> Silver -> Gold ->
+  # Consultas) e sai. É o que torna o fluxo "um comando só": no `docker compose up`
+  # ele roda depois que a base foi validada (preflight) e o bucket criado
+  # (minio-init), e o streamlit só sobe DEPOIS que ele termina (ver depends_on lá
+  # embaixo). Assim o dashboard nasce já com os dados em output/ — sem estado vazio
+  # e sem precisar reiniciar.
+  #
+  # Roda-SÓ-SE-necessário: se os 5 CSVs da Gold já estão em output/, PULA o
+  # reprocessamento (checagem de arquivo, instantânea — sem subir o Spark), então
+  # do 2º `up` em diante o ambiente sobe em segundos. Para FORÇAR um reprocesso:
+  # apague output/*.csv, ou rode o comando manual (que sempre reprocessa):
+  #   docker compose exec spark python -m src.run_pipeline
+  # O pipeline é idempotente (full-refresh), então reprocessar é sempre seguro.
+  # Reusa a imagem/env/volumes do spark.
+  # ----------------------------------------------------------------------------
+  pipeline:
+    build: .
+    container_name: case-pipeline
+    depends_on:
+      preflight:
+        condition: service_completed_successfully
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment: *spark-env
+    volumes: *spark-volumes
+    command:
+      - sh
+      - -c
+      - |
+        ok=1
+        for f in a_top5_operadoras b_faixa_etaria_top c_beneficiarios_por_municipio \
+                 insight_operadoras insight_faixa_etaria; do
+          [ -f "/app/output/$$f.csv" ] || ok=0
+        done
+        if [ "$$ok" = 1 ]; then
+          echo 'Gold ja processada (5 CSVs presentes em output/). Pulando o pipeline.'
+          echo 'Para reprocessar: apague output/*.csv ou rode: docker compose exec spark python -m src.run_pipeline'
+        else
+          python -m src.run_pipeline
+        fi
+
+  # ----------------------------------------------------------------------------
   # jupyter: JupyterLab (mesma imagem/volumes do spark), estilo Databricks.
   # Serviço separado só para ter linha própria no Docker Desktop com a porta 8888
   # clicável. Usa o CMD padrão do Dockerfile (jupyter lab).
@@ -78,6 +149,8 @@ services:
     build: .
     container_name: case-jupyter
     depends_on:
+      preflight:
+        condition: service_completed_successfully
       minio:
         condition: service_healthy
     environment: *spark-env
@@ -118,6 +191,12 @@ services:
   streamlit:
     build: ./app
     container_name: case-streamlit
+    # Só sobe DEPOIS que o pipeline one-shot termina com sucesso: garante que
+    # output/ já está populado quando o dashboard inicia. Elimina o antigo
+    # retrabalho (subir vazio -> rodar pipeline -> reiniciar o container).
+    depends_on:
+      pipeline:
+        condition: service_completed_successfully
     ports:
       - "8501:8501"   # Dashboard (http://localhost:8501)
     environment:

@@ -13,9 +13,10 @@ Ou apenas uma etapa:
 
 from __future__ import annotations
 
+import os
 import sys
 
-from src.config import get_spark, sql_params
+from src.config import csv_path, get_spark, sql_params
 from src.queries import run_queries
 from src.sql_runner import run_sql_file
 
@@ -28,6 +29,15 @@ STEPS = {
 
 def main() -> None:
     args = [a.lower() for a in sys.argv[1:]]
+
+    # Guard: sem a base bruta em data/ não há o que processar. Falha cedo, com
+    # mensagem clara, em vez de deixar o erro aflorar lá no fundo do Spark.
+    path = csv_path()
+    if not os.path.exists(path):
+        print(f"\nERRO: arquivo de dados nao encontrado: {path}")
+        print("Baixe a base da ANS (README > Dados) e coloque em data/ antes de rodar.\n")
+        sys.exit(1)
+
     spark = get_spark("case-ans-medallion")
     params = sql_params()
 

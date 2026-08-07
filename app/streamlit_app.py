@@ -280,11 +280,22 @@ def stat_card(
 # Carga dos dados (com cache). Cada CSV é uma tabela da camada Gold.
 # ---------------------------------------------------------------------------
 @st.cache_data
+def _read_csv(path: str, mtime: float) -> pd.DataFrame:
+    """Lê o CSV. Cacheado por (caminho, mtime): quando o arquivo muda no disco,
+    a chave muda e a leitura é refeita — sem servir dado velho."""
+    return pd.read_csv(path)
+
+
 def load_csv(name: str) -> pd.DataFrame | None:
+    # A checagem de existência fica FORA do cache de propósito: se cacheássemos o
+    # `None` de um arquivo ausente (como era antes), o dashboard subia vazio e
+    # continuava vazio mesmo depois do pipeline gerar o CSV — só um restart do
+    # container resolvia. Assim o miss nunca é cacheado e o arquivo é relido assim
+    # que aparece.
     path = OUTPUT_DIR / f"{name}.csv"
     if not path.exists():
         return None
-    return pd.read_csv(path)
+    return _read_csv(str(path), path.stat().st_mtime)
 
 
 # Distribuições completas (insight_*) quando disponíveis; senão, as versões

@@ -26,18 +26,32 @@ nuvem da empresa (AWS Glue/Athena/S3/Redshift + Databricks/Spark) sem custo.
 | Camada curada    | Gold (Delta)              | Amazon Redshift                       |
 | Visualização/BI  | Streamlit                 | QuickSight / Power BI / Databricks     |
 
-Serviços do `docker-compose.yml`: `minio` (S3), `minio-init` (cria bucket, é
-one-shot e sai com código 0 — normal), `spark` (PySpark + Delta; motor de
-processamento e alvo do `docker exec` do Airflow — fica vivo via `tail -f
-/dev/null`), `jupyter` (JupyterLab estilo Databricks, mesma imagem/volumes do
-`spark`, serviço separado só para ter linha/porta próprias no Docker Desktop),
-`spark-history` (Spark History Server — Spark UI de execuções já finalizadas, lê
-os event logs do volume `spark-events`), `postgres` (metastore do Airflow),
-`airflow-init` (migra schema + cria admin, one-shot, Exited 0 esperado),
-`airflow-webserver` (só a UI) e `airflow-scheduler` (agenda **e executa** as
-tasks, via LocalExecutor). Login: `admin` / `admin`. Há ainda `streamlit`
-(`case-streamlit`): dashboard/BI que lê os CSVs de `output/` (camada Gold) — não
-usa Spark/Java, imagem própria e enxuta em `app/`.
+Serviços do `docker-compose.yml`: `preflight` (`case-preflight`, guard one-shot em
+busybox: checa `data/pda-024-icb-SP-2025_08.csv` e sai 1 com mensagem clara se
+faltar — `spark`/`jupyter`/`pipeline` dependem dele via
+`service_completed_successfully`, então o `up` inteiro **aborta** sem a base),
+`minio` (S3), `minio-init` (cria bucket, é one-shot e sai com código 0 — normal),
+`spark` (PySpark + Delta; motor de processamento e alvo do `docker exec` do
+Airflow — fica vivo via `tail -f /dev/null`), `pipeline` (`case-pipeline`, job
+**one-shot** que roda o ETL completo `python -m src.run_pipeline` e sai; é o que
+torna o `up` "um comando só" — depende de `preflight`+`minio-init` e é dele que o
+`streamlit` depende, garantindo a ordem valida-dados → pipeline → dashboard.
+**Roda-só-se-necessário:** o command é um wrapper `sh` que checa se os 5 CSVs da
+Gold já estão em `output/`; se sim, **pula** o reprocessamento — instantâneo, sem
+subir o Spark — então do 2º `up` em diante o ambiente sobe em segundos. Forçar
+reprocesso = apagar `output/*.csv` ou rodar o `run_pipeline` manual, que **sempre**
+reprocessa, pois o skip vive só no compose, não no Python),
+`jupyter` (JupyterLab estilo Databricks, mesma imagem/volumes do `spark`, serviço
+separado só para ter linha/porta próprias no Docker Desktop), `spark-history`
+(Spark History Server — Spark UI de execuções já finalizadas, lê os event logs do
+volume `spark-events`), `postgres` (metastore do Airflow), `airflow-init` (migra
+schema + cria admin, one-shot, Exited 0 esperado), `airflow-webserver` (só a UI) e
+`airflow-scheduler` (agenda **e executa** as tasks, via LocalExecutor). Login:
+`admin` / `admin`. Há ainda `streamlit` (`case-streamlit`): dashboard/BI que lê os
+CSVs de `output/` (camada Gold) — não usa Spark/Java, imagem própria e enxuta em
+`app/`; **só sobe após o `pipeline` concluir** (`depends_on:
+service_completed_successfully`), então nasce já com os dados — sem estado vazio e
+sem precisar reiniciar.
 
 Portas: **8501** Streamlit (dashboard) · **8888** JupyterLab · **9000/9001** MinIO
 API/console · **4040** Spark UI (pipeline, `case-spark`) · **4041** Spark UI (jobs

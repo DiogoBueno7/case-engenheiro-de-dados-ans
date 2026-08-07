@@ -93,17 +93,22 @@ flowchart TB
 O arquivo bruto **não é versionado** no Git (≈ **1,5 GB**, `4.830.707` registros) —
 por isso, após clonar o repositório, é preciso baixá-lo separadamente.
 
-- **Fonte:** link completo: "https://ftp.dadosabertos.ans.gov.br/FTP/PDA/informacoes_consolidadas_de_beneficiarios-024/202508/pda-024-icb-SP-2025_08.zip"
-  
-  Dados Abertos da ANS — <https://dadosabertos.ans.gov.br/> (seção de
-  *Informações Consolidadas de Beneficiários*).
+**⬇️ Download direto (clique):**
+<https://ftp.dadosabertos.ans.gov.br/FTP/PDA/informacoes_consolidadas_de_beneficiarios-024/202508/pda-024-icb-SP-2025_08.zip>
+
+Depois de baixar, **descompacte o `.zip`** e coloque o `.csv` em `data/`:
+
+```
+data/pda-024-icb-SP-2025_08.csv
+```
+
+- **Fonte oficial:** Dados Abertos da ANS — <https://dadosabertos.ans.gov.br/>
+  (seção de *Informações Consolidadas de Beneficiários*).
 - **Arquivo esperado:** `pda-024-icb-SP-2025_08.csv` — beneficiários de São Paulo,
   competência **2025-08**. UTF-8, separador `;`, campos entre aspas.
-- **Onde colocar:** na pasta `data/` na raiz do projeto, com o nome exato acima:
-
-  ```
-  data/pda-024-icb-SP-2025_08.csv
-  ```
+- **Nome exato importa:** o ambiente valida esse arquivo na subida (serviço
+  `preflight`); se ele faltar, o `docker compose up` **aborta com mensagem clara**
+  em vez de falhar no meio do processamento.
 
 > Para reproduzir com outra competência/UF, basta ajustar o caminho em
 > `.env` / `src/config.py` (placeholder `{{CSV_PATH}}`) — o SQL não muda.
@@ -112,20 +117,43 @@ por isso, após clonar o repositório, é preciso baixá-lo separadamente.
 
 ## Como executar
 
-Pré-requisitos: **Docker** e **Docker Compose**. O arquivo
-`data/pda-024-icb-SP-2025_08.csv` já deve estar na pasta `data/`
-(veja **[Dados (como obter)](#dados-como-obter)** acima).
+Pré-requisitos: **Docker** e **Docker Compose**.
+
+**Passo 1 — baixe a base** e coloque em `data/` (só isso é manual):
+
+**⬇️ [pda-024-icb-SP-2025_08.zip](https://ftp.dadosabertos.ans.gov.br/FTP/PDA/informacoes_consolidadas_de_beneficiarios-024/202508/pda-024-icb-SP-2025_08.zip)** →
+descompacte → `data/pda-024-icb-SP-2025_08.csv`
+(detalhes em **[Dados (como obter)](#dados-como-obter)**).
+
+**Passo 2 — suba tudo com um comando:**
 
 ```bash
-# 1. (opcional) copie o exemplo de variáveis de ambiente
+# (opcional) copie o exemplo de variáveis de ambiente
 cp .env.example .env
 
-# 2. suba o ambiente (MinIO + Spark/Jupyter) — a primeira build baixa os jars
+# Um comando faz tudo, em ordem: valida a base -> build -> roda o pipeline
+# (Bronze -> Silver -> Gold -> Consultas) -> e só então sobe o dashboard.
 docker compose up -d --build
-
-# 3. rode o pipeline completo (Bronze -> Silver -> Gold -> Consultas)
-docker compose exec spark python -m src.run_pipeline
 ```
+
+> **Como funciona a ordem:** o `up` primeiro valida que a base está em `data/`
+> (serviço `preflight` — se faltar, **aborta aqui** com mensagem clara). Em
+> seguida roda o pipeline num container one-shot (`pipeline`) e, quando ele
+> termina, sobe o **Streamlit já com os dados** — sem estado vazio e sem precisar
+> reiniciar nada. Na **primeira** vez o pipeline processa os 4,8M de registros, então
+> o `up` **fica bloqueado alguns minutos** até concluir. Para acompanhar, em outro
+> terminal:
+>
+> ```bash
+> docker compose logs -f pipeline
+> ```
+>
+> **Roda só se necessário:** se os 5 CSVs da Gold já existem em `output/`, o
+> `pipeline` **pula o reprocessamento** — do 2º `up` em diante o ambiente sobe em
+> segundos. Para **forçar** um reprocesso, apague `output/*.csv` ou rode o comando
+> manual (veja abaixo).
+
+Pronto. Acesse:
 
 - **Dashboard (Streamlit)** — respostas do case + insights: http://localhost:8501
 - **JupyterLab** (notebooks estilo Databricks): http://localhost:8888
@@ -134,9 +162,14 @@ docker compose exec spark python -m src.run_pipeline
 - **Spark UI** (durante um job): http://localhost:4040
 - **Spark History Server** (Spark UI de execuções já finalizadas): http://localhost:18080
 
-Rodar apenas uma etapa:
+**Reprocessar** sem re-subir o ambiente (o container `case-spark` fica vivo) — o
+pipeline é idempotente (full-refresh), então rodar de novo é seguro:
 
 ```bash
+# pipeline completo
+docker compose exec spark python -m src.run_pipeline
+
+# ou apenas uma etapa
 docker compose exec spark python -m src.run_pipeline silver
 ```
 
@@ -263,7 +296,9 @@ Uma camada de **visualização/BI** (equivalente a *QuickSight / Power BI /
 Databricks Dashboards*) consome a camada **Gold** curada — os CSVs de `output/` —
 e apresenta as 3 respostas do case junto com alguns **insights** extras.
 
-Sobe junto com o ambiente (serviço `streamlit` do `docker-compose`):
+Sobe **automaticamente após o pipeline** (serviço `streamlit` do `docker-compose`,
+que depende da conclusão do job `pipeline`): quando o dashboard aparece, já está
+com os dados — **não precisa reiniciar**. Se quiser subir só ele explicitamente:
 
 ```bash
 docker compose up -d --build streamlit
